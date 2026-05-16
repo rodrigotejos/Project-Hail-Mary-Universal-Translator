@@ -1,0 +1,7 @@
+librosa
+sounddevice
+numpy
+faster-whisper
+flet
+scipy
+pytest

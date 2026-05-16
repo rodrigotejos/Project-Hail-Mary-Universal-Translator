@@ -1,0 +1,51 @@
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Pytest cache
+.pytest_cache/
+.cache/
+
+# IDEs
+.vscode/
+.idea/
+.qodo/
+
+# Audio Data (Large files)
+linguagens/**/*.wav
+linguagens/*/*.wav
+# Allow directory structure but ignore audio files
+!linguagens/
+!linguagens/**/
+
+# Images generated
+Gemini_Generated_Image_*.png
+
+# OS files
+.DS_Store
+Thumbs.db
