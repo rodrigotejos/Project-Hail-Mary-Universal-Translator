@@ -36,6 +36,7 @@ To ensure everything is working correctly:
 - **Record & Transcribe**: `python scripts/demo_recording.py` (Tests your mic and Whisper).
 - **Learn Vocabulary**: `python scripts/learn_vocabulary.py` (Learn new words and save to DB).
 - **List Vocabulary**: `python scripts/list_vocabulary.py` (See what's stored in SQLite).
+- **Real-time Translation**: `python scripts/translate_audio.py` (Identify spoken words from the learned database).
 
 ---
 
@@ -70,6 +71,7 @@ Para garantir que tudo está funcionando:
 - **Gravação e Transcrição**: `python scripts/demo_recording.py` (Testa seu mic e o Whisper).
 - **Aprender Vocabulário**: `python scripts/learn_vocabulary.py` (Ensina novas palavras e salva no banco).
 - **Listar Vocabulário**: `python scripts/list_vocabulary.py` (Ver o que está salvo no SQLite).
+- **Tradução em Tempo Real**: `python scripts/translate_audio.py` (Identifica palavras faladas comparando com o banco).
 
 ---
 

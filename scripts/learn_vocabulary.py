@@ -14,8 +14,8 @@ def main():
     print("Iniciando motores e carregando Whisper (small)...")
     translator = UniversalTranslator(model_size="small")
     
-    # Define o idioma alvo (ex: 'clingo' ou 'english')
-    target_lang = input("\nDigite o nome do idioma que quer ensinar (padrão: clingo): ") or "clingo"
+    # Define o idioma alvo (ex: 'ingles')
+    target_lang = input("\nDigite o nome do idioma que quer ensinar (padrão: ingles): ") or "ingles"
     
     while True:
         print("\n" + "="*50)
