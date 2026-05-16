@@ -1,0 +1,6 @@
+[MASTER]
+init-hook='import sys, os; sys.path.insert(0, os.path.abspath("src"))'
+
+[MESSAGES CONTROL]
+# Disable some Flet-specific false positives that might still occur
+disable=unexpected-keyword-arg,too-many-function-args,no-member

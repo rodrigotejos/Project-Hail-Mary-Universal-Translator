@@ -1,3 +1,6 @@
+"""
+Theme definitions for the Universal Translator UI.
+"""
 import flet as ft
 
 # Sci-Fi aesthetic theme
@@ -10,6 +13,7 @@ THEME = {
 }
 
 def get_theme():
+    """Returns the Flet Theme object based on defined colors."""
     return ft.Theme(
         color_scheme=ft.ColorScheme(
             primary=THEME["accent_color"],

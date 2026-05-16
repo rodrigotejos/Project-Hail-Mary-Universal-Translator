@@ -1,41 +1,44 @@
+"""
+Script for real-time audio translation using the Universal Translator.
+"""
 import os
 import sys
-import numpy as np
 
 # Adiciona a raiz do projeto ao path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from engine.translator import UniversalTranslator
+from engine.translator import UniversalTranslator  # pylint: disable=wrong-import-position
 
 def main():
+    """Main execution function for real-time translation."""
     print("=== MÓDULO DE TRADUÇÃO EM TEMPO REAL ===")
-    
+
     # Inicializa o tradutor SEM carregar o Whisper (pois aqui só usamos busca vetorial)
     print("Iniciando motores de comparação vetorial...")
     translator = UniversalTranslator(load_stt=False)
-    
+
     # Pergunta qual idioma estamos ouvindo
     target_lang = input("\nQual idioma você vai falar? (padrão: ingles): ") or "ingles"
     translator.target_language = target_lang
-    
+
     print(f"\n[SISTEMA ATIVO] Ouvindo idioma: {target_lang.upper()}")
     print("Dica: Fale uma palavra que você já ensinou ao sistema.")
     input("Pressione ENTER para começar a ouvir...")
-    
+
     try:
         # 1. Grava o áudio do usuário (o som 'desconhecido')
         audio_data = translator.audio_processor.record_audio(duration=4.0)
-        
+
         # --- DEBUG: Salva o que acabou de ser gravado ---
         debug_path = translator.audio_processor.save_audio(audio_data, "debug_translation", "teste")
         print(f"\n[DEBUG] 🔍 Áudio salvo em: {debug_path}")
         print("[DEBUG] Vá até esta pasta e escute o arquivo para checar o ruído!")
         print("-" * 50)
-        
+
         # 2. Tenta traduzir comparando assinaturas de áudio
         print("Analisando frequências e buscando no banco de dados...")
         result = translator.translate_alien_audio(audio_data)
-        
+
         print("\n" + "="*40)
         if result:
             print(f"TRADUÇÃO ENCONTRADA: {result}")
@@ -44,8 +47,8 @@ def main():
             print("TRADUÇÃO NÃO ENCONTRADA.")
             print("Dica: Verifique se você já ensinou essa palavra no script de aprendizado.")
         print("="*40)
-        
-    except Exception as e:
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"\n[ERRO] Ocorreu um problema: {e}")
 
 if __name__ == "__main__":

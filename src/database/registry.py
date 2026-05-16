@@ -1,8 +1,12 @@
+"""
+SQLite database registry for Universal Translator.
+"""
 import sqlite3
 import os
 from typing import List, Optional, Tuple
 
 class TranslatorDB:
+    """Class to manage SQLite database operations for the translator."""
     def __init__(self, db_path="src/database/registry.db"):
         # Garante que o diretório do banco existe
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -11,6 +15,7 @@ class TranslatorDB:
         self.create_tables()
 
     def create_tables(self):
+        """Create necessary tables if they do not exist."""
         cursor = self.conn.cursor()
         # Tabela de Idiomas
         cursor.execute("""
@@ -34,6 +39,7 @@ class TranslatorDB:
         self.conn.commit()
 
     def get_or_create_language(self, name: str) -> int:
+        """Get or create a language ID by name."""
         cursor = self.conn.cursor()
         cursor.execute("INSERT OR IGNORE INTO languages (name) VALUES (?)", (name.lower(),))
         self.conn.commit()
@@ -73,4 +79,5 @@ class TranslatorDB:
         return cursor.fetchall()
 
     def close(self):
+        """Close the database connection."""
         self.conn.close()
