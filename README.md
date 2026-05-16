@@ -8,6 +8,8 @@
 <a name="english"></a>
 ## 🌍 English Version
 
+![alt text](Gemini_Generated_Image_35pddd35pddd35pd.png)
+
 ### 1. Project Overview
 The **Universal Translator Project** (inspired by the interspecies communication concept in the book/movie *Project Hail Mary*) is a software system designed to learn, catalog, and translate unknown languages (alien or uncatalogued) in real-time.
 
@@ -65,6 +67,8 @@ Independent modules orchestrated by a General Manager.
 
 <a name="português"></a>
 ## 🇧🇷 Versão em Português
+
+![alt text](Gemini_Generated_Image_35pddd35pddd35pd.png)
 
 ### 1. Visão Geral do Projeto
 O **Projeto Tradução Universal** (inspirado no conceito de comunicação interespécies do livro/filme *Project Hail Mary*) é um sistema de software projetado para aprender, catalogar e traduzir em tempo real um idioma desconhecido (alienígena ou não catalogado).
