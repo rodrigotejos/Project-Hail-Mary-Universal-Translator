@@ -10,9 +10,9 @@ from engine.translator import UniversalTranslator
 def main():
     print("=== MÓDULO DE TRADUÇÃO EM TEMPO REAL ===")
     
-    # Inicializa o tradutor
-    print("Iniciando motores de comparação...")
-    translator = UniversalTranslator()
+    # Inicializa o tradutor SEM carregar o Whisper (pois aqui só usamos busca vetorial)
+    print("Iniciando motores de comparação vetorial...")
+    translator = UniversalTranslator(load_stt=False)
     
     # Pergunta qual idioma estamos ouvindo
     target_lang = input("\nQual idioma você vai falar? (padrão: ingles): ") or "ingles"
@@ -25,6 +25,12 @@ def main():
     try:
         # 1. Grava o áudio do usuário (o som 'desconhecido')
         audio_data = translator.audio_processor.record_audio(duration=4.0)
+        
+        # --- DEBUG: Salva o que acabou de ser gravado ---
+        debug_path = translator.audio_processor.save_audio(audio_data, "debug_translation", "teste")
+        print(f"\n[DEBUG] 🔍 Áudio salvo em: {debug_path}")
+        print("[DEBUG] Vá até esta pasta e escute o arquivo para checar o ruído!")
+        print("-" * 50)
         
         # 2. Tenta traduzir comparando assinaturas de áudio
         print("Analisando frequências e buscando no banco de dados...")

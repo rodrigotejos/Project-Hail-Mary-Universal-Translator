@@ -36,6 +36,10 @@ MANIFEST
 .idea/
 .qodo/
 
+# Databases
+*.db
+src/database/chroma_db/
+
 # Audio Data (Large files)
 linguagens/**/*.wav
 linguagens/*/*.wav

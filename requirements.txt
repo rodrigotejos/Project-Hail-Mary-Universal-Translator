@@ -5,3 +5,7 @@ faster-whisper
 flet
 scipy
 pytest
+chromadb
+torch
+torchaudio
+transformers

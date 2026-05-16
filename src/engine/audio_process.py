@@ -5,17 +5,19 @@ import os
 from typing import Optional, Tuple
 
 class AudioProcessor:
-    def __init__(self, sample_rate: int = 22050):
-        self.sample_rate = sample_rate
+    def __init__(self):
+        # O Spectrograma 1024D trabalha bem com 22050Hz
+        self.sample_rate = 22050
+        self.channels = 1
         self.audio_database_path = "linguagens"
-    
+
     def record_audio(self, duration: float = 3.0) -> np.ndarray:
         """Record audio from microphone"""
         print("Gravando áudio...")
         audio = sd.rec(
             int(duration * self.sample_rate),
             samplerate=self.sample_rate,
-            channels=1,
+            channels=self.channels,
             dtype='float32'
         )
         sd.wait()  # Wait until recording is finished
@@ -23,15 +25,66 @@ class AudioProcessor:
         return audio.flatten()
     
     def extract_features(self, audio: np.ndarray) -> np.ndarray:
-        """Extract MFCC features from audio"""
-        # Compute MFCCs
-        mfccs = librosa.feature.mfcc(
+        """Extract temporally-aware audio signature (Fixed-Size Mel-Spectrogram) with RMS Trim"""
+        target_shape = (32, 32)
+        vector_size = target_shape[0] * target_shape[1] # 1024
+        
+        if len(audio) == 0:
+            return np.zeros(vector_size)
+
+        # 1. Normalizar o volume para o máximo (ignora se você falou perto ou longe do mic)
+        max_val = np.max(np.abs(audio))
+        if max_val > 0:
+            audio = audio / max_val
+
+        # 2. Corte Inteligente (RMS) para isolar EXATAMENTE a palavra e ignorar ruído de fundo
+        rms = librosa.feature.rms(y=audio, frame_length=2048, hop_length=512)[0]
+        threshold = np.max(rms) * 0.10 # O som deve ter pelo menos 10% do volume máximo
+        active_frames = np.where(rms > threshold)[0]
+        
+        if len(active_frames) == 0:
+            return np.zeros(vector_size) # Retorna zero se for só silêncio
+            
+        # Pega a palavra e adiciona uma gordurinha de 0.1s de cada lado para não cortar seco
+        padding = int(0.1 * self.sample_rate)
+        start_sample = max(0, active_frames[0] * 512 - padding)
+        end_sample = min(len(audio), (active_frames[-1] + 1) * 512 + padding)
+        
+        audio = audio[start_sample:end_sample]
+
+        # 3. Pré-ênfase
+        audio = librosa.effects.preemphasis(audio)
+            
+        # 4. Gerar Espectrograma Mel
+        mel_spec = librosa.feature.melspectrogram(
             y=audio,
             sr=self.sample_rate,
-            n_mfcc=13
+            n_mels=target_shape[0]
         )
-        # Return mean of MFCCs across time
-        return np.mean(mfccs.T, axis=0)
+        mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+        
+        # --- FILTRO DE RUÍDO (NOISE GATE) ---
+        noise_threshold = -35 
+        mel_spec_db[mel_spec_db < noise_threshold] = -80
+        
+        # 5. Redimensionar matematicamente o eixo do tempo para caber em 32 fatias
+        import scipy.ndimage
+        time_bins = mel_spec_db.shape[1]
+        
+        if time_bins == 0:
+            return np.zeros(vector_size)
+            
+        zoom_factor = target_shape[1] / time_bins
+        resized_spec = scipy.ndimage.zoom(mel_spec_db, (1.0, zoom_factor))
+        
+        # 6. Transformar em vetor 1D e Padronizar
+        vector_1d = resized_spec.flatten()
+        vector_1d = (vector_1d - np.mean(vector_1d)) / (np.std(vector_1d) + 1e-8)
+        
+        # Normalização padrão para busca vetorial (Cosine Similarity)
+        vector_1d = vector_1d / (np.linalg.norm(vector_1d) + 1e-8)
+        
+        return vector_1d
     
     def save_audio(self, audio: np.ndarray, filename: str, language: str) -> str:
         """Save audio file to language directory"""
