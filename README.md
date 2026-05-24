@@ -34,6 +34,29 @@ Every PR, feedback, issue, or idea is highly welcome. Let's make interspecies tr
 *   **The Design Concept:** The image at the top of this README is the official design concept created to guide the UI development. It represents the vision of how the final translator console should look and behave.
 *   **Next Milestone:** Code the frontend interface (planned to be built using Flet/Flutter or React) and completely link the visual components to the backend translation pipeline. Contributions here are extremely welcome!
 
+### 🖥️ Graphic User Interface (UI) Conceptual Design
+The system interface features a Sci-Fi aesthetic, simulating a spaceship's control and telemetry console (inspired by the immersion in *Project Hail Mary*). The screen uses a dark background with cyan (neon) and orange illuminated borders, elements, and text, optimized for usability in low-light environments.
+
+The layout is strategically divided into two main operation modules running simultaneously, alongside a status header.
+
+#### 1. Status Header
+Located at the top of the screen, it contextualizes system operations:
+*   **Identification:** Displays the project title ("PROJECT: UNIVERSAL TRANSLATOR").
+*   **Telemetry/Connection:** In the top right corner, it displays the `[Cloud] STATUS: OFFLINE ONLY` alert in orange. This visually reminds the user that the software runs in a local-first architecture, processing neural networks offline without external dependencies.
+
+#### 2. Left Panel: Learning Module
+This area is dedicated to adding new vocabulary pairs (Few-Shot Learning) into the vector database.
+*   **Acoustic Validation (Top):** Shows the waveform of the last processed audio, accompanied by a play action button to allow checking if the non-human recording was captured cleanly.
+*   **Target Word Display (Center):** Displays the base language word currently being mapped in large, bright, centered letters (e.g., `MUSIC`).
+*   **Base Language Input:** Located directly below the target word, it has a standard text input field alongside `[Speak (Mic)]` and `[Confirm]` buttons, allowing the human to enter the semantic intention.
+*   **Target Sound Capture (Footer):** Features a large record button. Next to it, a dynamic VU meter reacts in real-time to microphone input, helping the user visualize the intensity of the grunt or alien sound being recorded.
+
+#### 3. Right Panel: Conversation Module
+This section operates as an instant messaging chat console for real-time, continuous interspecies translation.
+*   **Communication History (Chat):** Shows message bubbles with distinct avatars for "You" (Human) and the "Alien Entity".
+*   **Missing Words System (Visual Alert):** The key feature of the interface. When the system transcribes the received audio and detects "gaps" in the latent space (audio segments with no matching vector in the database), it displays a partial translation. Unrecognized words are printed in red (e.g., `Hello [untranslated], me, sir, [space] me, sir, you.`). This acts as a visual prompt telling the user exactly which terms need to be recorded in the Learning Module.
+*   **Message Input Prompt (Footer):** A standard text entry bar ("type a message...") with `[Speak]` and `[Send]` buttons. It captures the human sentence, parses it, finds the corresponding audio files, and plays them through the speaker for the alien entity.
+
 ---
 
 ### 🚀 The Architectural Journey: Learning from Our Mistakes
@@ -143,6 +166,29 @@ Qualquer Pull Request, feedback, issue ou ideia é muito bem-vinda. Vamos tornar
 *   **Frontend (Em Desenvolvimento / Ajuda Necessária):** A interface visual (UI) **ainda não está conectada ao backend**.
 *   **Concepção do Design:** A imagem conceitual no topo deste README representa a nossa visão de design para o painel de tradução final. Ela foi criada pelo idealizador do projeto para servir de base e inspiração para a interface gráfica.
 *   **Próximo Passo:** Codificar a interface gráfica (planejada para ser construída com Flet/Flutter ou React) e fazer toda a integração dos botões e painéis com a lógica do nosso backend. Contribuições nesta área são extremamente necessárias!
+
+### 🖥️ Design Conceitual da Interface do Usuário (UI)
+A interface do sistema foi desenhada com uma estética Sci-Fi (ficção científica), simulando o painel de controle e telemetria de uma nave espacial (inspirado na imersão de *Project Hail Mary*). A tela possui um fundo escuro com elementos, bordas e textos iluminados em tons de ciano (neon) e laranja, focando na usabilidade em ambientes de baixa luminosidade.
+
+O layout é dividido estrategicamente em dois módulos principais de operação simultânea, além de uma barra de status.
+
+#### 1. Cabeçalho de Status (Header)
+Localizado no topo da tela, ele contextualiza a operação do sistema:
+*   **Identificação:** Exibe o título do projeto ("PROJETO: TRADUÇÃO UNIVERSAL").
+*   **Telemetria/Conexão:** No canto superior direito, exibe o alerta `[Nuvem] STATUS: OFFLINE SOMENTE` em destaque laranja. Isso indica visualmente ao usuário que o software está rodando em sua versão local-first, processando as redes neurais sem depender de conexão externa.
+
+#### 2. Painel Esquerdo: Módulo de Aprendizado
+Esta é a área dedicada à inserção de novos pares de vocabulário (Few-Shot Learning) no banco de dados vetorial.
+*   **Validação Acústica (Topo):** Apresenta o espectro de onda (waveform) do último som processado e um botão de ação para reprodução, permitindo que o usuário valide se a gravação do som não-humano ficou nítida.
+*   **Display de Foco (Centro):** Exibe em letras garrafais, brilhantes e centralizadas (ex: `MÚSICA`) a palavra do idioma base que está sendo mapeada no momento.
+*   **Entrada do Idioma Base:** Logo abaixo da palavra em foco, há um campo de texto clássico e botões de `[Microfone (Falar)]` e `[Confirmar]`, permitindo que o humano insira a intenção semântica.
+*   **Captura do Som Alvo (Rodapé):** Contém um grande botão de gravação. Ao lado dele, barras dinâmicas de equalização (VU meter) reagem em tempo real à captação do microfone, auxiliando o usuário a visualizar a intensidade do grunhido ou som extraterrestre sendo gravado para emparelhamento.
+
+#### 3. Painel Direito: Módulo de Conversação
+Esta seção opera como um mensageiro instantâneo (Chatbot) para a comunicação contínua e em tempo real entre as espécies.
+*   **Histórico de Comunicação (Chat):** A tela exibe balões de diálogo com pequenos avatares diferenciando "Você" (Humano) e o "Ser Extraterrestre".
+*   **Sistema de Missing Words (Alerta Visual):** O grande diferencial da interface. Quando o sistema transcreve o áudio recebido e encontra lacunas no espaço latente (áudios sem correspondência no banco de dados), ele exibe a tradução parcial. As palavras ou sons não reconhecidos são impressos no balão de texto com a cor vermelha (ex: `Oi [não traduzido], me, senhor, [espaço] me, senhor, você.`). Isso serve como um gatilho visual para o humano saber exatamente o que precisa ser levado ao Módulo de Aprendizado.
+*   **Prompt de Entrada (Rodapé):** Uma barra de digitação padrão ("escrever mensagem...") acompanhada de botões de `[Falar]` e `[Enviar]`, responsável por captar a frase humana, fatiá-la, buscar os áudios correspondentes e reproduzi-los no alto-falante para o outro ser.
 
 ---
 
