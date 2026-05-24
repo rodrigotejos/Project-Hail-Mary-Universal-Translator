@@ -4,6 +4,7 @@ Universal Translator engine tying together audio processing, STT, and vector dat
 from typing import Optional, Tuple
 
 import numpy as np
+import sys
 
 from database.registry import TranslatorDB
 from database.vector_db import VectorDB
@@ -73,6 +74,15 @@ class UniversalTranslator:
             audio_path=filepath
         )
 
+        # 5. Aciona o Treinamento Siames se houver amostras suficientes
+        print("\n[SISTEMA] Verificando necessidade de alinhamento Siames interespécies...")
+        import subprocess
+        try:
+            # Chama o script de treino em background ou espera. Aqui vamos esperar para garantir.
+            subprocess.run([sys.executable, "scripts/train_siamese.py"], check=True)
+        except Exception as e:
+            print(f"[AVISO] Treinamento Siamês postergado. Adicione áudios correspondentes primeiro. Detalhe: {e}")
+            
         return filepath
 
     def translate_alien_audio(self, audio: np.ndarray) -> Optional[str]:

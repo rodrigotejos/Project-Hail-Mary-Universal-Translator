@@ -31,13 +31,10 @@ class AudioProcessor:
         print("Gravação concluída.")
         return audio.flatten()
 
-    def extract_features(self, audio: np.ndarray) -> np.ndarray: # pylint: disable=too-many-locals
-        """Extract temporally-aware audio signature (Fixed-Size Mel-Spectrogram) with RMS Trim"""
-        target_shape = (32, 32)
-        vector_size = target_shape[0] * target_shape[1] # 1024
-
+    def extract_features(self, audio: np.ndarray) -> np.ndarray:
+        """Extract temporally-aware audio signature (Siamese Network 1024D or fallback)"""
         if len(audio) == 0:
-            return np.zeros(vector_size)
+            return np.zeros(1024)
 
         # 1. Normalizar o volume para o máximo (ignora se você falou perto ou longe do mic)
         max_val = np.max(np.abs(audio))
@@ -48,48 +45,53 @@ class AudioProcessor:
         rms = librosa.feature.rms(y=audio, frame_length=2048, hop_length=512)[0]
         threshold = np.max(rms) * 0.10 # O som deve ter pelo menos 10% do volume máximo
         active_frames = np.where(rms > threshold)[0]
-
+        
         if len(active_frames) == 0:
-            return np.zeros(vector_size) # Retorna zero se for só silêncio
-
+            return np.zeros(1024) # Retorna zero se for só silêncio
+            
         # Pega a palavra e adiciona uma gordurinha de 0.1s de cada lado para não cortar seco
-        padding = int(0.1 * self.sample_rate)
+        padding = int(0.1 * self.sample_rate) # sample_rate is currently 22050
         start_sample = max(0, active_frames[0] * 512 - padding)
         end_sample = min(len(audio), (active_frames[-1] + 1) * 512 + padding)
-
+        
         audio = audio[start_sample:end_sample]
 
-        # 3. Pré-ênfase
-        audio = librosa.effects.preemphasis(audio)
+        import torch
+        import os
+        from engine.siamese_net import UniversalTranslatorSiameseNet, MelSpectrogramPipeline
+        
+        device = torch.device("cpu")
+        
+        # Converte para Tensor 16kHz
+        # librosa load is 22050. Let's resample to 16000 for the Siamese Net
+        import torchaudio.transforms as T
+        waveform = torch.tensor(audio, dtype=torch.float32).unsqueeze(0) # [1, tempo]
+        if self.sample_rate != 16000:
+            resampler = T.Resample(orig_freq=self.sample_rate, new_freq=16000)
+            waveform = resampler(waveform).to(device)
+        else:
+            waveform = waveform.to(device)
 
-        # 4. Gerar Espectrograma Mel
-        mel_spec = librosa.feature.melspectrogram(
-            y=audio,
-            sr=self.sample_rate,
-            n_mels=target_shape[0]
-        )
-        mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+        # 3. Transforma para Mel Spectrogram DB
+        transform_pipeline = MelSpectrogramPipeline(sample_rate=16000).to(device)
+        mel_db = transform_pipeline(waveform.to(device)).unsqueeze(0) # Adiciona dimensão Batch: [1, 1, Mels, Time]
 
-        # --- FILTRO DE RUÍDO (NOISE GATE) ---
-        noise_threshold = -35
-        mel_spec_db[mel_spec_db < noise_threshold] = -80
-
-        # 5. Redimensionar matematicamente o eixo do tempo para caber em 32 fatias
-        time_bins = mel_spec_db.shape[1]
-
-        if time_bins == 0:
-            return np.zeros(vector_size)
-
-        zoom_factor = target_shape[1] / time_bins
-        resized_spec = scipy.ndimage.zoom(mel_spec_db, (1.0, zoom_factor))
-
-        # 6. Transformar em vetor 1D e Padronizar
-        vector_1d = resized_spec.flatten()
-        vector_1d = (vector_1d - np.mean(vector_1d)) / (np.std(vector_1d) + 1e-8)
-
-        # Normalização padrão para busca vetorial (Cosine Similarity)
-        vector_1d = vector_1d / (np.linalg.norm(vector_1d) + 1e-8)
-
+        # 4. Inferência na Rede Siamesa (se existir modelo treinado)
+        model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'siamese_universal_translator_1024d.pth'))
+        
+        siamese_translator = UniversalTranslatorSiameseNet(embedding_dim=1024).to(device)
+        
+        if os.path.exists(model_path):
+            siamese_translator.load_state_dict(torch.load(model_path, map_location=device))
+        else:
+            print("[AVISO] Modelo Siamês não treinado encontrado. Retornando vetor latente randômico do backbone (Execute train_siamese.py para alinhar interespécies).")
+            
+        siamese_translator.eval()
+        
+        with torch.no_grad():
+            normalized_vector = siamese_translator.forward_single_branch(mel_db)
+            
+        vector_1d = normalized_vector.cpu().numpy().flatten()
         return vector_1d
 
     def save_audio(self, audio: np.ndarray, filename: str, language: str) -> str:

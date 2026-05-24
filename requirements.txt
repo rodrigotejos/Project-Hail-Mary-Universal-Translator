@@ -9,3 +9,5 @@ chromadb
 torch
 torchaudio
 transformers
+torchvision
+modal
