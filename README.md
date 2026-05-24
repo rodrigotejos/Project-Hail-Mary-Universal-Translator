@@ -5,15 +5,15 @@
 <details open>
 <summary><h2>🇧🇷 Versão em Português (Clique para expandir)</h2></summary>
 
-Um Tradutor Universal autônomo inspirado no livro *Devoradores de Estrelas / Project Hail Mary* (Andy Weir). Este sistema foi projetado para ouvir idiomas desconhecidos (seja fala humana, cliques alienígenas, acordes musicais ou sons de animais), catalogá-los e traduzi-los em tempo real usando Engenharia de Áudio Avançada e Bancos de Dados Vetoriais.
+Um Tradutor Universal autônomo inspirado no livro *Devoradores de Estrelas / Project Hail Mary* (Andy Weir). Este sistema foi projetado para ouvir e parear idiomas desconhecidos (seja fala humana, cliques alienígenas, acordes musicais ou vocalizações animais), catalogando-os e traduzindo-os em tempo real usando Inteligência Artificial de Métricas e Bancos de Dados Vetoriais.
 
 ### 🚀 A Jornada de Arquitetura: Aprendendo com Nossos Erros
 
-Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz para texto (STT). É sobre encontrar similaridade matemática entre sons completamente desconhecidos. Aqui está a jornada de engenharia que nos levou à arquitetura final, documentando nossas falhas e aprendizados:
+Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz para texto (STT). É sobre encontrar similaridade conceitual e fonética entre sons completamente díspares. Aqui está a jornada de engenharia que nos levou ao motor final:
 
 #### ❌ Tentativa 1: Média de MFCCs (13 a 20 Dimensões)
 * **A Ideia:** Extrair os Coeficientes Cepstrais de Frequência Mel (MFCCs) e tirar a média de todo o áudio.
-* **A Falha:** Tirar a média destrói a *linha do tempo* do áudio. Para o computador, "Food" e "House" pareciam quase a mesma coisa. Palavras diferentes davam *match* com 94% de similaridade porque suas frequências médias gerais eram parecidas.
+* **A Falha:** Tirar a média destrói a *linha do tempo* do áudio. Para o computador, "Food" e "House" pareciam a mesma coisa. Palavras diferentes davam *match* com 94% de similaridade porque suas frequências médias gerais eram parecidas.
 
 #### ❌ Tentativa 2: Espectrograma Mel Base (1024 Dimensões)
 * **A Ideia:** Converter o áudio em uma "imagem térmica" 2D do som (Espectrograma) e redimensionar matematicamente para uma grade fixa de 32x32 (1024 números) para preservar o tempo e resolver falantes rápidos/lentos.
@@ -25,23 +25,33 @@ Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz 
 
 #### ❌ Tentativa 4: O "Canto da Sereia" da Rede Neural (Modelo CLAP - 512D)
 * **A Ideia:** Usar uma IA de ponta (CLAP da LAION) treinada com milhões de áudios para extrair a "alma" do som imune a ruídos.
-* **A Falha Monumental (A Armadilha Semântica):** O CLAP é inteligente demais. Ele é um classificador *semântico*, não fonético. Quando você fala "Food" e "House", ele não compara as letras. Ele classifica os dois como **"Voz Humana"**! A IA deu exatamente a mesma pontuação (0.78) para palavras totalmente diferentes, porque para ela o som significava a mesma coisa (um humano falando). Descobrimos que Redes Neurais Comerciais destroem a fonética alienígena.
+* **A Falha Monumental (A Armadilha Semântica):** O CLAP é um classificador *semântico*, não fonético. Quando você fala "Food" e "House", ele classifica ambos como **"Voz Humana"**! A IA deu exatamente a mesma pontuação (0.78) para palavras totalmente diferentes, porque para ela o som significava a mesma coisa (um humano falando). Redes Neurais Comerciais destroem a fonética alienígena.
 
-#### ✅ O Santo Graal: Espectrograma Evoluído + Smart RMS Trimmer (1024D)
-A solução definitiva foi **voltar para a Matemática Pura (Tentativa 2)**, mas resolvendo sua única fraqueza.
-Criamos um **Cortador Inteligente de Energia (Smart RMS Trimmer)**. Antes de criar a imagem 32x32, o código varre o áudio, encontra o exato milissegundo em que a voz começa (ignorando cliques de mouse) e recorta exatamente a palavra.
-* **Resultado:** Sem cliques de mouse para empurrar o áudio, a palavra fica **perfeitamente centralizada** na grade 32x32 todas as vezes. Isso nos deu uma comparação **estritamente fonética** e perfeitamente imune ao tempo (falar rápido ou devagar), sem cair nas "armadilhas semânticas" das IAs. A matemática pura venceu.
+#### ❌ Tentativa 5: Espectrograma Evoluído + Smart RMS Trimmer (1024D)
+* **A Ideia:** Voltar para a Matemática Pura da grade 32x32, mas recortando milimetricamente o início e o fim da palavra com um detector de energia RMS para centralizar o som e evitar o deslocamento por ruídos.
+* **A Falha:** A comparação matemática direta ainda é "burra e literal". Ela compara frequência por frequência. Se um humano fala "Dog" e um gorila ou alienígena emite o som equivalente a "Dog", suas frequências físicas são ortogonais. A matemática diz que a similaridade é zero. Ela é incapaz de mapear intensões semânticas de corpos vocais diferentes.
+
+#### ✅ A Solução Definitiva: Rede Neural Siamesa Híbrida com Triplet Loss (1024D)
+Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** baseada no MobileNetV2:
+* **Triplet Loss (Distância Cosseno):** A rede é treinada mostrando trios de áudio (Âncora Humana, Positivo Alienígena, Negativo Alienígena). A matemática da loss força a IA a aproximar no espaço vetorial os sons com o mesmo significado (deformando os vetores até se sobreporem), enquanto empurra os sons diferentes para longe.
+* **Aumento Sintético de Dados (Data Augmentation):** Caso você tenha apenas um áudio gravado para a palavra, a IA injeta automaticamente ruído branco gaussiano e varia o volume para criar pares positivos sintéticos robustos, impedindo o vício da rede.
+* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 3 segundos.
+* **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
 
 ### 🛠️ Arquitetura
-- **Cérebro de Áudio:** Espectrograma Mel 32x32 de Tamanho Fixo + Smart RMS Trimmer.
-- **Memória Vetorial:** `ChromaDB` para buscas de alta dimensão usando similaridade de cosseno.
+- **Cérebro de Áudio:** Rede Siamesa MobileNetV2 + Pipeline Mel + RMS Trimmer.
+- **Treinamento Híbrido:** Local (GPU CUDA) ou Nuvem Serverless (Modal.com T4 GPU).
+- **Memória Vetorial:** `ChromaDB` (Espaço HNSW com similaridade de cosseno).
 - **Banco Relacional:** `SQLite` para catalogar vocabulário e metadados.
-- **Interface Humana:** `faster-whisper` para transcrever as respostas do humano para texto.
+- **Interface Humana:** `faster-whisper` (Whisper model 'small' em CPU).
 
 ### 💻 Como Executar
 1. Instale as dependências: `pip install -r requirements.txt`
-2. **Migrar/Reconstruir Banco:** `python scripts/migrate_to_vector_db.py`
-3. **Tradução em Tempo Real:** `python scripts/translate_audio.py`
+2. **Configuração do Modal (Apenas se usar o modo nuvem):** `venv\Scripts\modal.exe setup`
+3. **Ajuste o modo em `src/config.py`**: Configure `TRAINING_MODE = "cloud"` ou `"local"`.
+4. **Treinar a Rede Siamesa:** `python scripts/train_siamese.py`
+5. **Migrar/Reconstruir Banco:** `python scripts/migrate_to_vector_db.py`
+6. **Tradução em Tempo Real:** `python scripts/translate_audio.py`
 
 </details>
 
@@ -50,11 +60,11 @@ Criamos um **Cortador Inteligente de Energia (Smart RMS Trimmer)**. Antes de cri
 <details>
 <summary><h2>🇺🇸 English Version (Click to expand)</h2></summary>
 
-An autonomous Universal Translator inspired by the book *Project Hail Mary* (Andy Weir). This system is designed to listen to unknown languages (be it human speech, alien clicks, musical chords, or animal sounds), catalog them, and translate them in real-time using Advanced Audio Engineering and Vector Databases.
+An autonomous Universal Translator inspired by the book *Project Hail Mary* (Andy Weir). This system is designed to listen to unknown languages (be it human speech, alien clicks, musical chords, or animal sounds), catalog them, and translate them in real-time using Metric Learning Neural Networks and Vector Databases.
 
 ### 🚀 The Architectural Journey: Learning from Our Mistakes
 
-Building a true Universal Translator is not just about speech-to-text. It's about finding mathematical similarity between completely unknown sounds. Here is the engineering journey that led to our final architecture, documenting our failures and learnings:
+Building a true Universal Translator is not just about speech-to-text. It's about finding conceptual and phonetic similarity between completely disparate sounds. Here is the engineering journey that led to our final architecture:
 
 #### ❌ Attempt 1: Mean MFCCs (13 to 20 Dimensions)
 * **The Idea:** Extract the Mel-Frequency Cepstral Coefficients (MFCCs) and take the average across the entire audio clip.
@@ -70,22 +80,32 @@ Building a true Universal Translator is not just about speech-to-text. It's abou
 
 #### ❌ Attempt 4: The Neural Network Siren Song (CLAP Model - 512D)
 * **The Idea:** Use a state-of-the-art AI (LAION's CLAP) trained on millions of sounds to extract the ultimate noise-immune embedding.
-* **The Monumental Failure (The Semantic Trap):** CLAP is too smart. It is a *semantic* classifier, not a phonetic one. When you say "Food" and "House", it doesn't compare the letters. It classifies BOTH as **"Human Speech"**! The AI gave the exact same high score (0.78) for totally different words because, semantically, the sound meant the same thing (a human talking). We learned that Commercial AIs destroy alien phonetics.
+* **The Monumental Failure (The Semantic Trap):** CLAP is a *semantic* classifier, not a phonetic one. When you say "Food" and "House", it classifies BOTH as **"Human Speech"**! The AI gave the exact same high score (0.78) for totally different words because, semantically, the sound meant the same thing (a human talking). Commercial AIs destroy alien phonetics.
 
-#### ✅ The Holy Grail: Evolved Spectrogram + Smart RMS Trimmer (1024D)
-The definitive solution was to **return to Pure Math (Attempt 2)**, but fixing its only weakness.
-We created a **Smart RMS Energy Trimmer**. Before creating the 32x32 image, the code scans the audio, finds the exact millisecond the voice starts (ignoring mouse clicks), and precisely crops the word.
-* **The Result:** With no mouse clicks to shift the audio, the word is **perfectly centered** on the 32x32 grid every single time. This gave us a **strictly phonetic** comparison that is perfectly immune to time-stretching (fast/slow speakers), without falling into the "semantic traps" of AI. Pure math won.
+#### ❌ Attempt 5: Evolved Spectrogram + Smart RMS Trimmer (1024D)
+* **The Idea:** Return to the Pure Math of the 32x32 grid, but precisely cropping the start and end of the word using an RMS energy detector to center the sound and avoid shift sensitivity.
+* **The Failure:** Direct mathematical comparison is still "literal". It compares frequency by frequency. If a human says "Dog" and a gorilla or alien makes the equivalent "Dog" sound, their physical frequencies are orthogonal. Pure math says they are 0% similar, failing to bridge different vocal physiologies.
+
+#### ✅ The Definitive Solution: Hybrid Siamese Neural Network with Triplet Loss (1024D)
+To force the system to map the gorilla grunt, the alien noise, and the human speech representing "Dog" to the exact same concept, we abandoned literal acoustics and created a **Siamese Neural Network** based on MobileNetV2:
+* **Triplet Loss (Cosine Distance):** The network is trained using audio triplets (Human Anchor, Alien Positive, Alien Negative). The loss function forces the AI to bring vectors with the same meaning closer together on the unit sphere, while pushing different concepts apart.
+* **Synthetic Data Augmentation:** If you only have one recording of a word, the system automatically injects Gaussian white noise and varies the volume to create robust positive pairs, preventing representation collapse.
+* **Hybrid Architecture (Local/Modal.com):** Training can run **locally** on your RTX GPU (via CUDA 12.1) in 2 seconds or on the **cloud** by streaming tensors directly via API to a T4 GPU on **Modal.com** in 3 seconds.
+* **Safe Offline Inference:** Translation and feature extraction run 100% offline on the **CPU**. This resolves the cuDNN DLL conflicts with Whisper's engine (`faster-whisper`), while making the microphone initialize instantly.
 
 ### 🛠️ Architecture
-- **Audio Brain:** 32x32 Fixed-Size Mel-Spectrogram + Smart RMS Trimmer.
-- **Memory/Vector DB:** `ChromaDB` for high-dimensional cosine similarity searches.
+- **Audio Brain:** MobileNetV2 Siamese Network + Mel Pipeline + RMS Trimmer.
+- **Hybrid Training:** Local (GPU CUDA) or Cloud Serverless (Modal.com T4 GPU).
+- **Memory/Vector DB:** `ChromaDB` (HNSW space with cosine similarity).
 - **Relational DB:** `SQLite` for cataloging vocabulary and metadata.
-- **Human Interface:** `faster-whisper` for transcribing the human's response to text.
+- **Human Interface:** `faster-whisper` (Whisper model 'small' on CPU).
 
 ### 💻 How to Run
 1. Install dependencies: `pip install -r requirements.txt`
-2. **Migrate/Rebuild Database:** `python scripts/migrate_to_vector_db.py`
-3. **Real-Time Translation:** `python scripts/translate_audio.py`
+2. **Modal Setup (Only if using cloud mode):** `venv\Scripts\modal.exe setup`
+3. **Configure mode in `src/config.py`**: Set `TRAINING_MODE = "cloud"` or `"local"`.
+4. **Train the Siamese Network:** `python scripts/train_siamese.py`
+5. **Migrate/Rebuild Database:** `python scripts/migrate_to_vector_db.py`
+6. **Real-Time Translation:** `python scripts/translate_audio.py`
 
 </details>
