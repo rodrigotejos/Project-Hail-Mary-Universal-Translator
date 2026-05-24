@@ -44,7 +44,7 @@ class AudioProcessor:
         # 2. Corte Inteligente (RMS) para isolar EXATAMENTE a palavra e ignorar ruído de fundo
         rms = librosa.feature.rms(y=audio, frame_length=2048, hop_length=512)[0]
         threshold = np.max(rms) * 0.10 # O som deve ter pelo menos 10% do volume máximo
-        active_frames = np.where(rms > threshold)[0]
+        active_frames = np.nonzero(rms > threshold)[0]
 
         if len(active_frames) == 0:
             return np.zeros(1024) # Retorna zero se for só silêncio
@@ -85,7 +85,9 @@ class AudioProcessor:
         siamese_translator = UniversalTranslatorSiameseNet(embedding_dim=1024).to(device)
 
         if os.path.exists(model_path):
-            siamese_translator.load_state_dict(torch.load(model_path, map_location=device))
+            siamese_translator.load_state_dict(
+                torch.load(model_path, map_location=device, weights_only=True)
+            )
         else:
             print("[AVISO] Modelo Siamês não treinado encontrado. "
                   "Retornando vetor latente randômico do backbone.")

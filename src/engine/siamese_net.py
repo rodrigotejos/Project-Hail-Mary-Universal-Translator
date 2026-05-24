@@ -34,8 +34,7 @@ class InterspeciesTripletDataset(Dataset):
         # Detecta todos os idiomas disponíveis na pasta
         all_langs = set()
         for _, langs in data_dict.items():
-            for lang in langs.keys():
-                all_langs.add(lang)
+            all_langs.update(langs.keys())
 
         # Define idiomas alvos (qualquer pasta que não seja a âncora)
         self.target_langs = [l for l in all_langs if l != anchor_lang]
@@ -190,17 +189,28 @@ class UniversalTranslatorSiameseNet(nn.Module):
         """ Passagem Dupla ou Tripla """
         output_anchor = self.forward_single_branch(anchor)
         output_positive = self.forward_single_branch(positive)
-
-        if negative is not None:
-            output_negative = self.forward_single_branch(negative)
-            return output_anchor, output_positive, output_negative
-
-        return output_anchor, output_positive
+        output_negative = self.forward_single_branch(negative) if negative is not None else None
+        return output_anchor, output_positive, output_negative
 
 
 # ==============================================================================
 # 4. Orquestrador Computacional: Funções Auxiliares
 # ==============================================================================
+def _process_language_directory(lang: str, lang_path: str, data_dict: dict):
+    """Auxiliary function to process files in a single language directory."""
+    for filename in os.listdir(lang_path):
+        if filename.endswith(".wav"):
+            word = os.path.splitext(filename)[0].upper()
+            filepath = os.path.join(lang_path, filename)
+
+            if word not in data_dict:
+                data_dict[word] = {}
+            if lang not in data_dict[word]:
+                data_dict[word][lang] = []
+
+            data_dict[word][lang].append(filepath)
+
+
 def build_dataset_dictionary(base_path="linguagens"):
     """
     Lê a pasta de linguagens e monta o dicionário de treino.
@@ -213,15 +223,5 @@ def build_dataset_dictionary(base_path="linguagens"):
     for lang in os.listdir(base_path):
         lang_path = os.path.join(base_path, lang)
         if os.path.isdir(lang_path):
-            for filename in os.listdir(lang_path):
-                if filename.endswith(".wav"):
-                    word = os.path.splitext(filename)[0].upper()
-                    filepath = os.path.join(lang_path, filename)
-
-                    if word not in data_dict:
-                        data_dict[word] = {}
-                    if lang not in data_dict[word]:
-                        data_dict[word][lang] = []
-
-                    data_dict[word][lang].append(filepath)
+            _process_language_directory(lang, lang_path, data_dict)
     return data_dict
