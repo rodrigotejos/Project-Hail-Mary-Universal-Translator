@@ -1,0 +1,15 @@
+# Enforce LF line endings for cross-platform compatibility on text/code files
+*.py text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
+.gitignore text eol=lf
+.pylintrc text eol=lf
+
+# Track large model weights and media using Git LFS
+*.pth filter=lfs diff=lfs merge=lfs -text
+*.png filter=lfs diff=lfs merge=lfs -text
+*.pdf filter=lfs diff=lfs merge=lfs -text
+*.wav filter=lfs diff=lfs merge=lfs -text

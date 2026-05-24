@@ -1,10 +1,10 @@
 """
 Universal Translator engine tying together audio processing, STT, and vector database.
 """
+import sys
 from typing import Optional, Tuple
 
 import numpy as np
-import sys
 
 from database.registry import TranslatorDB
 from database.vector_db import VectorDB
@@ -14,12 +14,21 @@ from .stt_manager import STTManager
 
 class UniversalTranslator:
     """Core translator class connecting all components."""
-    def __init__(self, model_size: str = "small", device: str = "cpu", load_stt: bool = True):
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def __init__(
+        self,
+        model_size: str = "small",
+        device: str = "cpu",
+        load_stt: bool = True,
+        db_path: Optional[str] = None,
+        vector_db_path: Optional[str] = None
+    ):
         self.audio_processor = AudioProcessor()
         self.stt_manager = STTManager(model_size=model_size, device=device) if load_stt else None
-        self.db = TranslatorDB()
-        self.vdb = VectorDB()
+        self.db = TranslatorDB(db_path) if db_path else TranslatorDB()
+        self.vdb = VectorDB(vector_db_path) if vector_db_path else VectorDB()
         self.target_language = "clingo" # Idioma alienígena padrão
+
 
     def listen_and_transcribe(self, duration: float = 3.0) -> str:
         """Grava áudio e transcreve para texto usando Whisper"""
@@ -76,13 +85,14 @@ class UniversalTranslator:
 
         # 5. Aciona o Treinamento Siames se houver amostras suficientes
         print("\n[SISTEMA] Verificando necessidade de alinhamento Siames interespécies...")
-        import subprocess
+        import subprocess # pylint: disable=import-outside-toplevel
         try:
-            # Chama o script de treino em background ou espera. Aqui vamos esperar para garantir.
+            # Chama o script de treino em background ou espera. Aqui vamos esperar.
             subprocess.run([sys.executable, "scripts/train_siamese.py"], check=True)
-        except Exception as e:
-            print(f"[AVISO] Treinamento Siamês postergado. Adicione áudios correspondentes primeiro. Detalhe: {e}")
-            
+        except Exception as e: # pylint: disable=broad-exception-caught
+            print("[AVISO] Treinamento Siamês postergado. "
+                  f"Adicione áudios correspondentes primeiro. Detalhe: {e}")
+
         return filepath
 
     def translate_alien_audio(self, audio: np.ndarray) -> Optional[str]:

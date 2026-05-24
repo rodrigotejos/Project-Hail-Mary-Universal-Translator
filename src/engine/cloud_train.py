@@ -1,21 +1,23 @@
+"""
+Cloud training module using Modal.
+"""
 import os
 import modal
 import torch
-import torch.nn as nn
+from torch import nn
+from torch import optim
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import DataLoader
 
 # 1. Configuração do ambiente remoto do Modal
 app = modal.App("phm-universal-translator")
 
 # Imagem Docker com dependências otimizadas para GPU T4
 docker_image = modal.Image.debian_slim().pip_install(
-    "torch==2.5.1", 
-    "torchvision==0.20.1", 
-    "torchaudio==2.5.1", 
-    "librosa", 
-    "numpy", 
+    "torch==2.5.1",
+    "torchvision==0.20.1",
+    "torchaudio==2.5.1",
+    "librosa",
+    "numpy",
     "scipy"
 )
 
@@ -26,12 +28,14 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
     Função executada remotamente em uma GPU T4 no Modal.
     Recebe os tensores de áudio em memória, treina a rede siamesa e retorna o state_dict.
     """
+    # pylint: disable=too-many-locals, import-outside-toplevel
+    from torch.utils.data import DataLoader
     from engine.siamese_net import (
         UniversalTranslatorSiameseNet,
         MelSpectrogramPipeline,
         InterspeciesTripletDataset
     )
-    
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[NUVEM] Iniciando treinamento no Modal. Acelerador ativo: {device}")
 
@@ -49,18 +53,20 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
         shuffle=True,
         num_workers=0
     )
-    
+
     siamese_translator = UniversalTranslatorSiameseNet(embedding_dim=1024).to(device)
-    
-    cosine_distance_fn = lambda x, y: 1.0 - F.cosine_similarity(x, y)
+
+    def cosine_distance_fn(x, y):
+        return 1.0 - F.cosine_similarity(x, y) # pylint: disable=not-callable
+
     loss_function = nn.TripletMarginWithDistanceLoss(
         distance_function=cosine_distance_fn,
         margin=0.3,
         reduction='mean'
     )
-    
+
     optimizer = optim.AdamW(siamese_translator.parameters(), lr=2e-4, weight_decay=1e-3)
-    
+
     siamese_translator.train()
     for epoch in range(epochs):
         cumulative_epoch_loss = 0.0
@@ -68,15 +74,17 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
             anchor_mel = transform_pipeline(anchor_audio.to(device))
             positive_mel = transform_pipeline(positive_audio.to(device))
             negative_mel = transform_pipeline(negative_audio.to(device))
-            
+
             optimizer.zero_grad()
-            v_anchor, v_positive, v_negative = siamese_translator(anchor_mel, positive_mel, negative_mel)
+            v_anchor, v_positive, v_negative = siamese_translator(
+                anchor_mel, positive_mel, negative_mel
+            )
             loss = loss_function(v_anchor, v_positive, v_negative)
             loss.backward()
             optimizer.step()
-            
+
             cumulative_epoch_loss += loss.item()
-            
+
         mean_loss = cumulative_epoch_loss / len(triplet_loader)
         print(f"[NUVEM] Época {epoch+1}/{epochs} | Loss: {mean_loss:.4f}")
 
@@ -90,6 +98,7 @@ def run_cloud_training(data_dict, epochs=10, batch_size=8, anchor_lang='ingles')
     Função executada localmente. Carrega os arquivos físicos de áudio da pasta local,
     converte em tensores de memória e envia para o Modal via chamada de API.
     """
+    # pylint: disable=too-many-locals, import-outside-toplevel
     import librosa
     print("\n=== INICIANDO CONEXÃO E ENVIO PARA O MODAL (NUVEM COM GPU T4) ===")
     print("[LOCAL] Carregando arquivos físicos em memória...")
@@ -103,11 +112,13 @@ def run_cloud_training(data_dict, epochs=10, batch_size=8, anchor_lang='ingles')
             for path in filepaths:
                 # Carrega o áudio localmente em 16kHz
                 waveform_np, _ = librosa.load(path, sr=16000, mono=True)
-                waveform_tensor = torch.tensor(waveform_np, dtype=torch.float32).unsqueeze(0)
+                waveform_tensor = torch.tensor(
+                    waveform_np, dtype=torch.float32
+                ).unsqueeze(0)
                 in_memory_data[word][lang].append(waveform_tensor)
 
     print("[LOCAL] Estabelecendo conexão com o Modal e enviando tensores...")
-    
+
     # Executa a função na nuvem e espera pelo retorno do state_dict
     with app.run():
         state_dict = train_siamese_on_modal.remote(
@@ -121,7 +132,7 @@ def run_cloud_training(data_dict, epochs=10, batch_size=8, anchor_lang='ingles')
     models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'models'))
     os.makedirs(models_dir, exist_ok=True)
     model_path = os.path.join(models_dir, 'siamese_universal_translator_1024d.pth')
-    
+
     torch.save(state_dict, model_path)
     print(f"\n[LOCAL] Modelo recebido da nuvem e salvo em: {model_path}")
     print("[LOCAL] Treinamento Remoto Concluído com Sucesso!")
