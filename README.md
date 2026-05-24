@@ -32,7 +32,8 @@ Every PR, feedback, issue, or idea is highly welcome. Let's make interspecies tr
 *   **Backend (Complete & Stable):** Our core Python engine is fully functional! It handles RMS-based word isolation, features extraction using PyTorch Siamese Networks (trained on RTX GPUs locally or serverless GPU T4 in the cloud via Modal), SQLite metadata tracking, and ChromaDB vector search.
 *   **Frontend (In Progress / Help Wanted):** The graphic user interface (UI) is **not yet connected to the backend**. 
 *   **The Design Concept:** The image at the top of this README is the official design concept created to guide the UI development. It represents the vision of how the final translator console should look and behave.
-*   **Next Milestone:** Code the frontend interface (planned to be built using Flet/Flutter or React) and completely link the visual components to the backend translation pipeline. Contributions here are extremely welcome!
+*   **Next Milestone (UI):** Code the frontend interface (planned to be built using Flet/Flutter or React) and completely link the visual components to the backend translation pipeline. Contributions here are extremely welcome!
+*   **Next Milestone (Cloud Sync):** Migrate the local databases (SQLite + ChromaDB) to a unified Cloud Vector Database (Supabase) to enable an Interstellar Synchronization Architecture (Local-First offline operation with asynchronous cloud syncing). See `docs/cloud_vector_db_sync_architecture.md` for the technical design.
 
 ### 🖥️ Graphic User Interface (UI) Conceptual Design
 The system interface features a Sci-Fi aesthetic, simulating a spaceship's control and telemetry console (inspired by the immersion in *Project Hail Mary*). The screen uses a dark background with cyan (neon) and orange illuminated borders, elements, and text, optimized for usability in low-light environments.
@@ -165,7 +166,8 @@ Qualquer Pull Request, feedback, issue ou ideia é muito bem-vinda. Vamos tornar
 *   **Backend (Completo & Estável):** Nosso motor em Python está totalmente funcional! Ele gerencia o isolamento de palavras por energia RMS, extração de assinaturas via Redes Siamesas (treinadas localmente em GPU RTX ou na nuvem no Modal), banco relacional SQLite e buscas vetoriais no ChromaDB.
 *   **Frontend (Em Desenvolvimento / Ajuda Necessária):** A interface visual (UI) **ainda não está conectada ao backend**.
 *   **Concepção do Design:** A imagem conceitual no topo deste README representa a nossa visão de design para o painel de tradução final. Ela foi criada pelo idealizador do projeto para servir de base e inspiração para a interface gráfica.
-*   **Próximo Passo:** Codificar a interface gráfica (planejada para ser construída com Flet/Flutter ou React) e fazer toda a integração dos botões e painéis com a lógica do nosso backend. Contribuições nesta área são extremamente necessárias!
+*   **Próximo Passo (UI):** Codificar a interface gráfica (planejada para ser construída com Flet/Flutter ou React) e fazer toda a integração dos botões e painéis com a lógica do nosso backend. Contribuições nesta área são extremamente necessárias!
+*   **Próximo Passo (Cloud Sync):** Migrar os bancos locais (SQLite + ChromaDB) para um Banco de Dados Vetorial em Nuvem unificado (Supabase) para permitir uma Arquitetura de Sincronização Interestelar (operação offline Local-First com sincronização assíncrona na nuvem). Veja `docs/cloud_vector_db_sync_architecture.md` para o design técnico.
 
 ### 🖥️ Design Conceitual da Interface do Usuário (UI)
 A interface do sistema foi desenhada com uma estética Sci-Fi (ficção científica), simulando o painel de controle e telemetria de uma nave espacial (inspirado na imersão de *Project Hail Mary*). A tela possui um fundo escuro com elementos, bordas e textos iluminados em tons de ciano (neon) e laranja, focando na usabilidade em ambientes de baixa luminosidade.
