@@ -38,6 +38,42 @@ Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a vo
 * **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 3 segundos.
 * **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
 
+---
+
+### 🔄 Fluxo de Trabalho (Como Usar o Tradutor)
+
+Para rodar e alimentar o Tradutor Universal no seu dia a dia, siga os 4 passos abaixo:
+
+#### Passo 1: Ensinar uma Nova Voz (Gravação)
+Cadastre as vozes e palavras no sistema rodando o script de aprendizado:
+```bash
+venv\Scripts\python.exe scripts/learn_vocabulary.py
+```
+* **O que acontece:** O terminal vai perguntar qual palavra humana você quer cadastrar (ex: `DOG`) e qual idioma (ex: `ingles`). Em seguida, grave a voz falando a palavra. Se você quiser cadastrar uma versão alienígena, rode novamente definindo o idioma como `clingo` (ou `elvish`, `klingon`, etc.)
+
+#### Passo 2: Treinar o "Cérebro" do Tradutor
+Atualize a inteligência da Rede Siamesa com as novas vozes gravadas:
+```bash
+venv\Scripts\python.exe scripts/train_siamese.py
+```
+* **Ajuste Fino:** Altere a variável `TRAINING_MODE` em `src/config.py` para escolher entre `"local"` (RTX GPU) ou `"cloud"` (GPU T4 do Modal). Ao rodar o script, os pesos da IA serão recalculados e salvos localmente em `models/siamese_universal_translator_1024d.pth`.
+
+#### Passo 3: Sincronizar o Banco Vetorial
+Gere os novos vetores matemáticos para todos os áudios e salve-os no banco indexado:
+```bash
+venv\Scripts\python.exe scripts/migrate_to_vector_db.py
+```
+* **O que acontece:** O script limpa o ChromaDB antigo e converte em milissegundos todos os áudios locais em vetores de 1024D usando o cérebro treinado no Passo 2.
+
+#### Passo 4: Traduzir em Tempo Real
+Abra o tradutor universal e fale no microfone:
+```bash
+venv\Scripts\python.exe scripts/translate_audio.py
+```
+* **O que acontece:** O sistema abrirá o microfone. Escolha o idioma de escuta (ex: `ingles`). Ao falar no microfone, ele fará a busca vetorial via Distância Cosseno no banco gerado no Passo 3 e retornará a tradução instantaneamente na tela.
+
+---
+
 ### 🛠️ Arquitetura
 - **Cérebro de Áudio:** Rede Siamesa MobileNetV2 + Pipeline Mel + RMS Trimmer.
 - **Treinamento Híbrido:** Local (GPU CUDA) ou Nuvem Serverless (Modal.com T4 GPU).
@@ -45,13 +81,9 @@ Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a vo
 - **Banco Relacional:** `SQLite` para catalogar vocabulário e metadados.
 - **Interface Humana:** `faster-whisper` (Whisper model 'small' em CPU).
 
-### 💻 Como Executar
+### 💻 Como Executar (Instalação)
 1. Instale as dependências: `pip install -r requirements.txt`
 2. **Configuração do Modal (Apenas se usar o modo nuvem):** `venv\Scripts\modal.exe setup`
-3. **Ajuste o modo em `src/config.py`**: Configure `TRAINING_MODE = "cloud"` ou `"local"`.
-4. **Treinar a Rede Siamesa:** `python scripts/train_siamese.py`
-5. **Migrar/Reconstruir Banco:** `python scripts/migrate_to_vector_db.py`
-6. **Tradução em Tempo Real:** `python scripts/translate_audio.py`
 
 </details>
 
@@ -93,6 +125,42 @@ To force the system to map the gorilla grunt, the alien noise, and the human spe
 * **Hybrid Architecture (Local/Modal.com):** Training can run **locally** on your RTX GPU (via CUDA 12.1) in 2 seconds or on the **cloud** by streaming tensors directly via API to a T4 GPU on **Modal.com** in 3 seconds.
 * **Safe Offline Inference:** Translation and feature extraction run 100% offline on the **CPU**. This resolves the cuDNN DLL conflicts with Whisper's engine (`faster-whisper`), while making the microphone initialize instantly.
 
+---
+
+### 🔄 Project Workflow (How to Use)
+
+To run and feed the Universal Translator, follow these 4 steps:
+
+#### Step 1: Teach a New Voice (Recording)
+Register voices and words by running the vocabulary learning script:
+```bash
+venv\Scripts\python.exe scripts/learn_vocabulary.py
+```
+* **What happens:** The console will ask which word you want to register (e.g., `DOG`) and the language (e.g., `ingles`). Next, record your voice saying the word. If you want to register an alien sound, run it again setting the language to `clingo` (or `elvish`, `klingon`, etc.) and record the alien sound.
+
+#### Step 2: Train the Translator's "Brain"
+Update the Siamese Network's weights with the newly recorded voices:
+```bash
+venv\Scripts\python.exe scripts/train_siamese.py
+```
+* **Configuration:** Change the `TRAINING_MODE` variable in `src/config.py` to choose between `"local"` (RTX GPU) or `"cloud"` (Modal.com T4 GPU). Running the script will recalculate the model's weights and save them to `models/siamese_universal_translator_1024d.pth`.
+
+#### Step 3: Rebuild the Vector Database
+Generate the new high-dimensional vectors and store them in the index:
+```bash
+venv\Scripts\python.exe scripts/migrate_to_vector_db.py
+```
+* **What happens:** This script wipes the old ChromaDB and converts all local audio files to 1024D vectors in milliseconds using the model trained in Step 2.
+
+#### Step 4: Real-Time Translation
+Start the translator and talk into the microphone:
+```bash
+venv\Scripts\python.exe scripts/translate_audio.py
+```
+* **What happens:** The system opens your microphone. Select the listening language (e.g., `ingles`). When you speak, it queries ChromaDB using Cosine Distance and outputs the translation instantly on your screen.
+
+---
+
 ### 🛠️ Architecture
 - **Audio Brain:** MobileNetV2 Siamese Network + Mel Pipeline + RMS Trimmer.
 - **Hybrid Training:** Local (GPU CUDA) or Cloud Serverless (Modal.com T4 GPU).
@@ -100,12 +168,8 @@ To force the system to map the gorilla grunt, the alien noise, and the human spe
 - **Relational DB:** `SQLite` for cataloging vocabulary and metadata.
 - **Human Interface:** `faster-whisper` (Whisper model 'small' on CPU).
 
-### 💻 How to Run
+### 💻 How to Run (Installation)
 1. Install dependencies: `pip install -r requirements.txt`
 2. **Modal Setup (Only if using cloud mode):** `venv\Scripts\modal.exe setup`
-3. **Configure mode in `src/config.py`**: Set `TRAINING_MODE = "cloud"` or `"local"`.
-4. **Train the Siamese Network:** `python scripts/train_siamese.py`
-5. **Migrate/Rebuild Database:** `python scripts/migrate_to_vector_db.py`
-6. **Real-Time Translation:** `python scripts/translate_audio.py`
 
 </details>
