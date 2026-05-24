@@ -5,6 +5,7 @@ faster-whisper
 flet
 scipy
 pytest
+pylint
 chromadb
 torch
 torchaudio
