@@ -2,10 +2,30 @@
 
 ![alt text](Gemini_Generated_Image_35pddd35pddd35pd.png)
 
+🌌 **Join the Mission: Let's Build Interspecies Communication Together! / Junte-se à Missão: Vamos Construir a Comunicação Interespécies Juntos!**
+
+*“You’re a scientist. You know that observation changes the result.”* – Andy Weir, Project Hail Mary.
+
+---
+
 <details open>
 <summary><h2>🇺🇸 English Version (Click to expand)</h2></summary>
 
 An autonomous Universal Translator inspired by the book *Project Hail Mary* (Andy Weir). This system is designed to listen to unknown languages (be it human speech, alien clicks, musical chords, or animal sounds), catalog them, and translate them in real-time using Metric Learning Neural Networks and Vector Databases.
+
+### 🌌 A Call to All Scientists and Engineers!
+
+This project was born out of a passion for science fiction, exobiology, and acoustic engineering. Just like Ryland Grace and Rocky, we are learning to bridge the gap between different worlds. 
+
+If you love space exploration, alien linguistics, deep learning, or signal processing, **you are invited to be part of this journey!** There is still so much to build:
+*   Adding pre-compiled audio sets for iconic sci-fi languages (Klingon, Dothraki, Elvish, etc.).
+*   Improving the Siamese Network's backbone or trying new acoustic embeddings.
+*   Optimizing real-time noise reduction for noisy environments.
+*   Expanding the UI/UX for a premium, futuristic translation console.
+
+Every PR, feedback, issue, or idea is highly welcome. Let's make interspecies translation a reality. 🖖
+
+---
 
 ### 🚀 The Architectural Journey: Learning from Our Mistakes
 
@@ -92,7 +112,21 @@ venv\Scripts\python.exe scripts/translate_audio.py
 <details>
 <summary><h2>🇧🇷 Versão em Português (Clique para expandir)</h2></summary>
 
-Um Tradutor Universal autônomo inspirado no livro *Devoradores de Estrelas / Project Hail Mary* (Andy Weir). Este sistema foi projetado para ouvir e parear idiomas desconhecidos (seja fala humana, cliques alienígenas, acordes musicais ou vocalizações animais), catalogando-os e traduzindo-os em tempo real usando Inteligência Artificial de Métricas e Bancos de Dados Vetoriais.
+Um Tradutor Universal autônomo inspirado no livro *Devoradores de Estrelas / Project Hail Mary* (Andy Weir). Este sistema foi projetado para ouvir e parear idiomas desconhecidos (seja fala humana, cliques alienígenas, acordes musicais ou vocalizações animais), catalogá-los e traduzindo-os em tempo real usando Inteligência Artificial de Métricas e Bancos de Dados Vetoriais.
+
+### 🌌 Um Chamado a Todos os Cientistas e Engenheiros!
+
+Este projeto nasceu da paixão por ficção científica, exobiologia e engenharia acústica. Assim como Ryland Grace e Rocky, estamos aprendendo a construir pontes entre mundos diferentes.
+
+Se você ama exploração espacial, linguística alienígena, deep learning ou processamento de sinais, **você é nosso convidado especial para fazer parte desta jornada!** Há muito o que melhorar e construir:
+*   Cadastrar e disponibilizar áudios de pronúncias de línguas icônicas da ficção (Klingon, Dothraki, Élfico, etc.).
+*   Aprimorar a arquitetura da nossa Rede Siamesa ou testar novas redes de extração de embeddings.
+*   Melhorar filtros de redução de ruído em tempo real para o microfone.
+*   Evoluir a Interface Gráfica para criar um console de tradução futurista premium.
+
+Qualquer Pull Request, feedback, issue ou ideia é muito bem-vinda. Vamos tornar a tradução interespécies uma realidade. 🖖
+
+---
 
 ### 🚀 A Jornada de Arquitetura: Aprendendo com Nossos Erros
 
@@ -122,7 +156,7 @@ Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz 
 Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** baseada no MobileNetV2:
 * **Triplet Loss (Distância Cosseno):** A rede é treinada mostrando trios de áudio (Âncora Humana, Positivo Alienígena, Negativo Alienígena). A matemática da loss força a IA a aproximar no espaço vetorial os sons com o mesmo significado (deformando os vetores até se sobreporem), enquanto empurra os sons diferentes para longe.
 * **Aumento Sintético de Dados (Data Augmentation):** Caso você tenha apenas um áudio gravado para a palavra, a IA injeta automaticamente ruído branco gaussiano e varia o volume para criar pares positivos sintéticos robustos, impedindo o vício da rede.
-* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 3 segundos.
+* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** in 3 segundos.
 * **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
 
 ---
