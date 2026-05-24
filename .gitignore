@@ -53,3 +53,7 @@ Gemini_Generated_Image_*.png
 # OS files
 .DS_Store
 Thumbs.db
+
+# Models (Large weights)
+models/*.pth
+models/**/*.pth

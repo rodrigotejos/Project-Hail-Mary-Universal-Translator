@@ -1,95 +1,8 @@
-# Project Hail Mary - Tradutor Universal / Universal Translator
+# Project Hail Mary - Universal Translator / Tradutor Universal
 
 ![alt text](Gemini_Generated_Image_35pddd35pddd35pd.png)
 
 <details open>
-<summary><h2>🇧🇷 Versão em Português (Clique para expandir)</h2></summary>
-
-Um Tradutor Universal autônomo inspirado no livro *Devoradores de Estrelas / Project Hail Mary* (Andy Weir). Este sistema foi projetado para ouvir e parear idiomas desconhecidos (seja fala humana, cliques alienígenas, acordes musicais ou vocalizações animais), catalogando-os e traduzindo-os em tempo real usando Inteligência Artificial de Métricas e Bancos de Dados Vetoriais.
-
-### 🚀 A Jornada de Arquitetura: Aprendendo com Nossos Erros
-
-Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz para texto (STT). É sobre encontrar similaridade conceitual e fonética entre sons completamente díspares. Aqui está a jornada de engenharia que nos levou ao motor final:
-
-#### ❌ Tentativa 1: Média de MFCCs (13 a 20 Dimensões)
-* **A Ideia:** Extrair os Coeficientes Cepstrais de Frequência Mel (MFCCs) e tirar a média de todo o áudio.
-* **A Falha:** Tirar a média destrói a *linha do tempo* do áudio. Para o computador, "Food" e "House" pareciam a mesma coisa. Palavras diferentes davam *match* com 94% de similaridade porque suas frequências médias gerais eram parecidas.
-
-#### ❌ Tentativa 2: Espectrograma Mel Base (1024 Dimensões)
-* **A Ideia:** Converter o áudio em uma "imagem térmica" 2D do som (Espectrograma) e redimensionar matematicamente para uma grade fixa de 32x32 (1024 números) para preservar o tempo e resolver falantes rápidos/lentos.
-* **A Falha:** A grade de tempo ficou rígida demais. Se o microfone captasse um clique aleatório do mouse pouco antes da palavra ser falada, a palavra inteira era "empurrada" na grade 32x32. A similaridade caía para 36% mesmo sendo a mesma palavra.
-
-#### ❌ Tentativa 3: MFCCs Estatísticos (60 Dimensões)
-* **A Ideia:** Extrair Média, Desvio Padrão e Pico Máximo. Isso capturaria a "textura" do som sem depender de uma linha do tempo rígida.
-* **A Falha:** A normalização (Z-score) achatou os dados. O modelo ficou "míope" e não conseguia mais notar a diferença fonética entre as palavras.
-
-#### ❌ Tentativa 4: O "Canto da Sereia" da Rede Neural (Modelo CLAP - 512D)
-* **A Ideia:** Usar uma IA de ponta (CLAP da LAION) treinada com milhões de áudios para extrair a "alma" do som imune a ruídos.
-* **A Falha Monumental (A Armadilha Semântica):** O CLAP é um classificador *semântico*, não fonético. Quando você fala "Food" e "House", ele classifica ambos como **"Voz Humana"**! A IA deu exatamente a mesma pontuação (0.78) para palavras totalmente diferentes, porque para ela o som significava a mesma coisa (um humano falando). Redes Neurais Comerciais destroem a fonética alienígena.
-
-#### ❌ Tentativa 5: Espectrograma Evoluído + Smart RMS Trimmer (1024D)
-* **A Ideia:** Voltar para a Matemática Pura da grade 32x32, mas recortando milimetricamente o início e o fim da palavra com um detector de energia RMS para centralizar o som e evitar o deslocamento por ruídos.
-* **A Falha:** A comparação matemática direta ainda é "burra e literal". Ela compara frequência por frequência. Se um humano fala "Dog" e um gorila ou alienígena emite o som equivalente a "Dog", suas frequências físicas são ortogonais. A matemática diz que a similaridade é zero. Ela é incapaz de mapear intensões semânticas de corpos vocais diferentes.
-
-#### ✅ A Solução Definitiva: Rede Neural Siamesa Híbrida com Triplet Loss (1024D)
-Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** baseada no MobileNetV2:
-* **Triplet Loss (Distância Cosseno):** A rede é treinada mostrando trios de áudio (Âncora Humana, Positivo Alienígena, Negativo Alienígena). A matemática da loss força a IA a aproximar no espaço vetorial os sons com o mesmo significado (deformando os vetores até se sobreporem), enquanto empurra os sons diferentes para longe.
-* **Aumento Sintético de Dados (Data Augmentation):** Caso você tenha apenas um áudio gravado para a palavra, a IA injeta automaticamente ruído branco gaussiano e varia o volume para criar pares positivos sintéticos robustos, impedindo o vício da rede.
-* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 3 segundos.
-* **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
-
----
-
-### 🔄 Fluxo de Trabalho (Como Usar o Tradutor)
-
-Para rodar e alimentar o Tradutor Universal no seu dia a dia, siga os 4 passos abaixo:
-
-#### Passo 1: Ensinar uma Nova Voz (Gravação)
-Cadastre as vozes e palavras no sistema rodando o script de aprendizado:
-```bash
-venv\Scripts\python.exe scripts/learn_vocabulary.py
-```
-* **O que acontece:** O terminal vai perguntar qual palavra humana você quer cadastrar (ex: `DOG`) e qual idioma (ex: `ingles`). Em seguida, grave a voz falando a palavra. Se você quiser cadastrar uma versão alienígena, rode novamente definindo o idioma como `clingo` (ou `elvish`, `klingon`, etc.)
-
-#### Passo 2: Treinar o "Cérebro" do Tradutor
-Atualize a inteligência da Rede Siamesa com as novas vozes gravadas:
-```bash
-venv\Scripts\python.exe scripts/train_siamese.py
-```
-* **Ajuste Fino:** Altere a variável `TRAINING_MODE` em `src/config.py` para escolher entre `"local"` (RTX GPU) ou `"cloud"` (GPU T4 do Modal). Ao rodar o script, os pesos da IA serão recalculados e salvos localmente em `models/siamese_universal_translator_1024d.pth`.
-
-#### Passo 3: Sincronizar o Banco Vetorial
-Gere os novos vetores matemáticos para todos os áudios e salve-os no banco indexado:
-```bash
-venv\Scripts\python.exe scripts/migrate_to_vector_db.py
-```
-* **O que acontece:** O script limpa o ChromaDB antigo e converte em milissegundos todos os áudios locais em vetores de 1024D usando o cérebro treinado no Passo 2.
-
-#### Passo 4: Traduzir em Tempo Real
-Abra o tradutor universal e fale no microfone:
-```bash
-venv\Scripts\python.exe scripts/translate_audio.py
-```
-* **O que acontece:** O sistema abrirá o microfone. Escolha o idioma de escuta (ex: `ingles`). Ao falar no microfone, ele fará a busca vetorial via Distância Cosseno no banco gerado no Passo 3 e retornará a tradução instantaneamente na tela.
-
----
-
-### 🛠️ Arquitetura
-- **Cérebro de Áudio:** Rede Siamesa MobileNetV2 + Pipeline Mel + RMS Trimmer.
-- **Treinamento Híbrido:** Local (GPU CUDA) ou Nuvem Serverless (Modal.com T4 GPU).
-- **Memória Vetorial:** `ChromaDB` (Espaço HNSW com similaridade de cosseno).
-- **Banco Relacional:** `SQLite` para catalogar vocabulário e metadados.
-- **Interface Humana:** `faster-whisper` (Whisper model 'small' em CPU).
-
-### 💻 Como Executar (Instalação)
-1. Instale as dependências: `pip install -r requirements.txt`
-2. **Configuração do Modal (Apenas se usar o modo nuvem):** `venv\Scripts\modal.exe setup`
-
-</details>
-
-<br>
-
-<details>
 <summary><h2>🇺🇸 English Version (Click to expand)</h2></summary>
 
 An autonomous Universal Translator inspired by the book *Project Hail Mary* (Andy Weir). This system is designed to listen to unknown languages (be it human speech, alien clicks, musical chords, or animal sounds), catalog them, and translate them in real-time using Metric Learning Neural Networks and Vector Databases.
@@ -171,5 +84,92 @@ venv\Scripts\python.exe scripts/translate_audio.py
 ### 💻 How to Run (Installation)
 1. Install dependencies: `pip install -r requirements.txt`
 2. **Modal Setup (Only if using cloud mode):** `venv\Scripts\modal.exe setup`
+
+</details>
+
+<br>
+
+<details>
+<summary><h2>🇧🇷 Versão em Português (Clique para expandir)</h2></summary>
+
+Um Tradutor Universal autônomo inspirado no livro *Devoradores de Estrelas / Project Hail Mary* (Andy Weir). Este sistema foi projetado para ouvir e parear idiomas desconhecidos (seja fala humana, cliques alienígenas, acordes musicais ou vocalizações animais), catalogando-os e traduzindo-os em tempo real usando Inteligência Artificial de Métricas e Bancos de Dados Vetoriais.
+
+### 🚀 A Jornada de Arquitetura: Aprendendo com Nossos Erros
+
+Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz para texto (STT). É sobre encontrar similaridade conceitual e fonética entre sons completamente díspares. Aqui está a jornada de engenharia que nos levou ao motor final:
+
+#### ❌ Tentativa 1: Média de MFCCs (13 a 20 Dimensões)
+* **A Ideia:** Extrair os Coeficientes Cepstrais de Frequência Mel (MFCCs) e tirar a média de todo o áudio.
+* **A Falha:** Tirar a média destrói a *linha do tempo* do áudio. Para o computador, "Food" e "House" pareciam a mesma coisa. Palavras diferentes davam *match* com 94% de similaridade porque suas frequências médias gerais eram parecidas.
+
+#### ❌ Tentativa 2: Espectrograma Mel Base (1024 Dimensões)
+* **A Ideia:** Converter o áudio em uma "imagem térmica" 2D do som (Espectrograma) e redimensionar matematicamente para uma grade fixa de 32x32 (1024 números) para preservar o tempo e resolver falantes rápidos/lentos.
+* **A Falha:** A grade de tempo ficou rígida demais. Se o microfone captasse um clique aleatório do mouse pouco antes da palavra ser falada, a palavra inteira era "empurrada" na grade 32x32. A similaridade caía para 36% mesmo sendo a mesma palavra.
+
+#### ❌ Tentativa 3: MFCCs Estatísticos (60 Dimensões)
+* **A Ideia:** Extrair Média, Desvio Padrão e Pico Máximo. Isso capturaria a "textura" do som sem depender de uma linha do tempo rígida.
+* **A Falha:** A normalização (Z-score) achatou os dados. O modelo ficou "míope" e não conseguia mais notar a diferença fonética entre as palavras.
+
+#### ❌ Tentativa 4: O "Canto da Sereia" da Rede Neural (Modelo CLAP - 512D)
+* **A Ideia:** Usar uma IA de ponta (CLAP da LAION) treinada com milhões de áudios para extrair a "alma" do som imune a ruídos.
+* **A Falha Monumental (A Armadilha Semântica):** O CLAP é um classificador *semântico*, não fonético. Quando você fala "Food" e "House", ele classifica ambos como **"Voz Humana"**! A IA deu exatamente a mesma pontuação (0.78) para palavras totalmente diferentes, porque para ela o som significava a mesma coisa (um humano falando). Redes Neurais Comerciais destroem a fonética alienígena.
+
+#### ❌ Tentativa 5: Espectrograma Evoluído + Smart RMS Trimmer (1024D)
+* **A Ideia:** Voltar para a Matemática Pura da grade 32x32, mas recortando milimetricamente o início e o fim da palavra com um detector de energia RMS para centralizar o som e evitar o deslocamento por ruídos.
+* **A Falha:** A comparação matemática direta ainda é "burra e literal". Ela compara frequência por frequência. Se um humano fala "Dog" e um gorila ou alienígena emite o som equivalente a "Dog", suas frequências físicas são ortogonais. A matemática diz que a similaridade é zero. Ela é incapaz de mapear intensões semânticas de corpos vocais diferentes.
+
+#### ✅ A Solução Definitiva: Rede Neural Siamesa Híbrida com Triplet Loss (1024D)
+Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** baseada no MobileNetV2:
+* **Triplet Loss (Distância Cosseno):** A rede é treinada mostrando trios de áudio (Âncora Humana, Positivo Alienígena, Negativo Alienígena). A matemática da loss força a IA a aproximar no espaço vetorial os sons com o mesmo significado (deformando os vetores até se sobreporem), enquanto empurra os sons diferentes para longe.
+* **Aumento Sintético de Dados (Data Augmentation):** Caso você tenha apenas um áudio gravado para a palavra, a IA injeta automaticamente ruído branco gaussiano e varia o volume para criar pares positivos sintéticos robustos, impedindo o vício da rede.
+* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 3 segundos.
+* **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
+
+---
+
+### 🔄 Fluxo de Trabalho (Como Usar o Tradutor)
+
+Para rodar e alimentar o Tradutor Universal no seu dia a dia, siga os 4 passos abaixo:
+
+#### Passo 1: Ensinar uma Nova Voz (Gravação)
+Cadastre as vozes e palavras no sistema rodando o script de aprendizado:
+```bash
+venv\Scripts\python.exe scripts/learn_vocabulary.py
+```
+* **O que acontece:** O terminal vai perguntar qual palavra humana você quer cadastrar (ex: `DOG`) e qual idioma (ex: `ingles`). Em seguida, grave a voz falando a palavra. Se você quiser cadastrar uma versão alienígena, rode novamente definindo o idioma como `clingo` (ou `elvish`, `klingon`, etc.) e grave o ruído bizarro da palavra.
+
+#### Passo 2: Treinar o "Cérebro" do Tradutor
+Atualize a inteligência da Rede Siamesa com as novas vozes gravadas:
+```bash
+venv\Scripts\python.exe scripts/train_siamese.py
+```
+* **Ajuste Fino:** Altere a variável `TRAINING_MODE` em `src/config.py` para escolher entre `"local"` (RTX GPU) ou `"cloud"` (GPU T4 do Modal). Ao rodar o script, os pesos da IA serão recalculados e salvos localmente em `models/siamese_universal_translator_1024d.pth`.
+
+#### Passo 3: Sincronizar o Banco Vetorial
+Gere os novos vetores matemáticos para todos os áudios e salve-os no banco indexado:
+```bash
+venv\Scripts\python.exe scripts/migrate_to_vector_db.py
+```
+* **O que acontece:** O script limpa o ChromaDB antigo e converte em milissegundos todos os áudios locais em vetores de 1024D usando o cérebro treinado no Passo 2.
+
+#### Passo 4: Traduzir em Tempo Real
+Abra o tradutor universal e fale no microfone:
+```bash
+venv\Scripts\python.exe scripts/translate_audio.py
+```
+* **O que acontece:** O sistema abrirá o microfone. Escolha o idioma de escuta (ex: `ingles`). Ao falar no microfone, ele fará a busca vetorial via Distância Cosseno no banco gerado no Passo 3 e retornará a tradução instantaneamente na tela.
+
+---
+
+### 🛠️ Arquitetura
+- **Cérebro de Áudio:** Rede Siamesa MobileNetV2 + Pipeline Mel + RMS Trimmer.
+- **Treinamento Híbrido:** Local (GPU CUDA) ou Nuvem Serverless (Modal.com T4 GPU).
+- **Memória Vetorial:** `ChromaDB` (Espaço HNSW com similaridade de cosseno).
+- **Banco Relacional:** `SQLite` para catalogar vocabulário e metadados.
+- **Interface Humana:** `faster-whisper` (Whisper model 'small' em CPU).
+
+### 💻 Como Executar (Instalação)
+1. Instale as dependências: `pip install -r requirements.txt`
+2. **Configuração do Modal (Apenas se usar o modo nuvem):** `venv\Scripts\modal.exe setup`
 
 </details>
