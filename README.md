@@ -27,6 +27,15 @@ Every PR, feedback, issue, or idea is highly welcome. Let's make interspecies tr
 
 ---
 
+### 🚦 Project Status & Next Steps
+
+*   **Backend (Complete & Stable):** Our core Python engine is fully functional! It handles RMS-based word isolation, features extraction using PyTorch Siamese Networks (trained on RTX GPUs locally or serverless GPU T4 in the cloud via Modal), SQLite metadata tracking, and ChromaDB vector search.
+*   **Frontend (In Progress / Help Wanted):** The graphic user interface (UI) is **not yet connected to the backend**. 
+*   **The Design Concept:** The image at the top of this README is the official design concept created to guide the UI development. It represents the vision of how the final translator console should look and behave.
+*   **Next Milestone:** Code the frontend interface (planned to be built using Flet/Flutter or React) and completely link the visual components to the backend translation pipeline. Contributions here are extremely welcome!
+
+---
+
 ### 🚀 The Architectural Journey: Learning from Our Mistakes
 
 Building a true Universal Translator is not just about speech-to-text. It's about finding conceptual and phonetic similarity between completely disparate sounds. Here is the engineering journey that led to our final architecture:
@@ -128,6 +137,15 @@ Qualquer Pull Request, feedback, issue ou ideia é muito bem-vinda. Vamos tornar
 
 ---
 
+### 🚦 Status do Projeto & Próximos Passos
+
+*   **Backend (Completo & Estável):** Nosso motor em Python está totalmente funcional! Ele gerencia o isolamento de palavras por energia RMS, extração de assinaturas via Redes Siamesas (treinadas localmente em GPU RTX ou na nuvem no Modal), banco relacional SQLite e buscas vetoriais no ChromaDB.
+*   **Frontend (Em Desenvolvimento / Ajuda Necessária):** A interface visual (UI) **ainda não está conectada ao backend**.
+*   **Concepção do Design:** A imagem conceitual no topo deste README representa a nossa visão de design para o painel de tradução final. Ela foi criada pelo idealizador do projeto para servir de base e inspiração para a interface gráfica.
+*   **Próximo Passo:** Codificar a interface gráfica (planejada para ser construída com Flet/Flutter ou React) e fazer toda a integração dos botões e painéis com a lógica do nosso backend. Contribuições nesta área são extremamente necessárias!
+
+---
+
 ### 🚀 A Jornada de Arquitetura: Aprendendo com Nossos Erros
 
 Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz para texto (STT). É sobre encontrar similaridade conceitual e fonética entre sons completamente díspares. Aqui está a jornada de engenharia que nos levou ao motor final:
@@ -156,7 +174,7 @@ Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz 
 Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** baseada no MobileNetV2:
 * **Triplet Loss (Distância Cosseno):** A rede é treinada mostrando trios de áudio (Âncora Humana, Positivo Alienígena, Negativo Alienígena). A matemática da loss força a IA a aproximar no espaço vetorial os sons com o mesmo significado (deformando os vetores até se sobreporem), enquanto empurra os sons diferentes para longe.
 * **Aumento Sintético de Dados (Data Augmentation):** Caso você tenha apenas um áudio gravado para a palavra, a IA injeta automaticamente ruído branco gaussiano e varia o volume para criar pares positivos sintéticos robustos, impedindo o vício da rede.
-* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 2 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** in 3 segundos.
+* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 60 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 60 segundos.
 * **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
 
 ---
