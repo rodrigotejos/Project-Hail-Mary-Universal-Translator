@@ -231,10 +231,13 @@ class UniversalTranslatorSiameseNet(nn.Module):
             flattened_vector = torch.flatten(pooled_tensor, 1)
             projection_vector = self.projection_bottleneck(flattened_vector)
         elif self.model_backbone == "ast":
-            # Para o AST, a entrada é [batch, 1024, 128]
-            outputs = self.backbone(input_values=audio_tensor)
-            # Extrai o token CLS na posição 0
-            cls_token = outputs.last_hidden_state[:, 0, :]
+            if audio_tensor.ndim == 2 and audio_tensor.shape[-1] == 768:
+                cls_token = audio_tensor
+            else:
+                # Para o AST, a entrada é [batch, 1024, 128]
+                outputs = self.backbone(input_values=audio_tensor)
+                # Extrai o token CLS na posição 0
+                cls_token = outputs.last_hidden_state[:, 0, :]
             projection_vector = self.projection_bottleneck(cls_token)
 
         # Modificação C: L2-Norm Obrigatória para adequação matemática da similaridade Cosseno

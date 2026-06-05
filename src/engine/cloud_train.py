@@ -59,7 +59,13 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
     transform_pipeline = AcousticTransformPipeline(model_backbone=model_backbone).to(device)
     transform_pipeline.eval()
 
-    # Pré-computa características acústicas na nuvem para otimização de performance (evita CPU feature extraction por época)
+    siamese_translator = UniversalTranslatorSiameseNet(
+        embedding_dim=1024,
+        model_backbone=model_backbone
+    ).to(device)
+    siamese_translator.eval()
+
+    # Pré-computa características acústicas na nuvem para otimização de performance (evita CPU feature extraction e transformer backbone por época)
     print("[NUVEM] Pré-computando características acústicas...")
     precomputed_data = {}
     with torch.no_grad():
@@ -69,7 +75,13 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
                 precomputed_data[word][lang] = []
                 for wave in waveforms:
                     feature = transform_pipeline(wave.to(device))
-                    precomputed_data[word][lang].append(feature.squeeze(0).cpu())
+                    if model_backbone == "ast":
+                        # Extrai o token CLS de 768D diretamente do backbone de forma única
+                        outputs = siamese_translator.backbone(input_values=feature)
+                        cls_token = outputs.last_hidden_state[:, 0, :]
+                        precomputed_data[word][lang].append(cls_token.squeeze(0).cpu())
+                    else:
+                        precomputed_data[word][lang].append(feature.squeeze(0).cpu())
 
     # Inicializa dataset passando os tensores pré-computados
     interspecies_dataset = InterspeciesTripletDataset(
@@ -84,11 +96,6 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
         shuffle=True,
         num_workers=0
     )
-
-    siamese_translator = UniversalTranslatorSiameseNet(
-        embedding_dim=1024,
-        model_backbone=model_backbone
-    ).to(device)
 
     def cosine_distance_fn(x, y):
         return 1.0 - F.cosine_similarity(x, y) # pylint: disable=not-callable

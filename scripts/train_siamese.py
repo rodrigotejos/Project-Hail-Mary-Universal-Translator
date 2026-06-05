@@ -50,6 +50,13 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
     transform_pipeline = AcousticTransformPipeline(model_backbone=ACOUSTIC_MODEL_BACKBONE).to(device)
     transform_pipeline.eval()
 
+    # 3. Inicializa Rede Siamesa
+    siamese_translator = UniversalTranslatorSiameseNet(
+        embedding_dim=1024,
+        model_backbone=ACOUSTIC_MODEL_BACKBONE
+    ).to(device)
+    siamese_translator.eval()
+
     # Pré-computa características acústicas para acelerar o loop de treinamento (evita reprocessamento por época)
     print("[INFO] Pré-computando características acústicas...")
     precomputed_data = {}
@@ -64,7 +71,14 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
                     waveform_np, _ = librosa.load(path, sr=16000, mono=True)
                     waveform = torch.tensor(waveform_np, dtype=torch.float32).unsqueeze(0).to(device)
                     feature = transform_pipeline(waveform)
-                    precomputed_data[word][lang].append(feature.squeeze(0).cpu())
+                    
+                    if ACOUSTIC_MODEL_BACKBONE == "ast":
+                        # Extrai o token CLS de 768D diretamente do backbone de forma única
+                        outputs = siamese_translator.backbone(input_values=feature)
+                        cls_token = outputs.last_hidden_state[:, 0, :]
+                        precomputed_data[word][lang].append(cls_token.squeeze(0).cpu())
+                    else:
+                        precomputed_data[word][lang].append(feature.squeeze(0).cpu())
 
     try:
         interspecies_dataset = InterspeciesTripletDataset(
@@ -83,12 +97,6 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
         shuffle=True,
         num_workers=0
     )
-
-    # 3. Inicializa Rede Siamesa
-    siamese_translator = UniversalTranslatorSiameseNet(
-        embedding_dim=1024,
-        model_backbone=ACOUSTIC_MODEL_BACKBONE
-    ).to(device)
 
     # 4. Estruturação da Triplet Loss com Distância Cosseno
     def cosine_distance_fn(x, y):
