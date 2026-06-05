@@ -16,6 +16,8 @@ class AudioProcessor:
         self.sample_rate = 22050
         self.channels = 1
         self.audio_database_path = "linguagens"
+        self._model = None
+        self._model_backbone = None
 
     def record_audio(self, duration: float = 3.0) -> np.ndarray:
         """Record audio from microphone"""
@@ -58,7 +60,8 @@ class AudioProcessor:
 
         import torch
         import torchaudio.transforms as T
-        from engine.siamese_net import UniversalTranslatorSiameseNet, MelSpectrogramPipeline
+        from config import ACOUSTIC_MODEL_BACKBONE
+        from engine.siamese_net import UniversalTranslatorSiameseNet, AcousticTransformPipeline
 
         device = torch.device("cpu")
 
@@ -71,31 +74,42 @@ class AudioProcessor:
         else:
             waveform = waveform.to(device)
 
-        # 3. Transforma para Mel Spectrogram DB
-        transform_pipeline = MelSpectrogramPipeline(sample_rate=16000).to(device)
-        # Adiciona dimensão Batch: [1, 1, Mels, Time]
-        mel_db = transform_pipeline(waveform.to(device)).unsqueeze(0)
+        # 3. Transforma para Mel Spectrogram DB ou AST Input Values
+        transform_pipeline = AcousticTransformPipeline(
+            model_backbone=ACOUSTIC_MODEL_BACKBONE,
+            sample_rate=16000
+        ).to(device)
+        
+        features_input = transform_pipeline(waveform)
+        if ACOUSTIC_MODEL_BACKBONE == "mobilenet":
+            # MobileNet expects channel dimension [1, 1, mels, time]
+            features_input = features_input.unsqueeze(0)
 
         # 4. Inferência na Rede Siamesa (se existir modelo treinado)
-        model_path = os.path.abspath(os.path.join(
-            os.path.dirname(__file__), '..', '..', 'models',
-            'siamese_universal_translator_1024d.pth'
-        ))
+        if self._model is None or self._model_backbone != ACOUSTIC_MODEL_BACKBONE:
+            model_filename = f'siamese_universal_translator_1024d_{ACOUSTIC_MODEL_BACKBONE}.pth'
+            model_path = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..', 'models', model_filename
+            ))
 
-        siamese_translator = UniversalTranslatorSiameseNet(embedding_dim=1024).to(device)
+            self._model = UniversalTranslatorSiameseNet(
+                embedding_dim=1024,
+                model_backbone=ACOUSTIC_MODEL_BACKBONE
+            ).to(device)
 
-        if os.path.exists(model_path):
-            siamese_translator.load_state_dict(
-                torch.load(model_path, map_location=device, weights_only=True)
-            )
-        else:
-            print("[AVISO] Modelo Siamês não treinado encontrado. "
-                  "Retornando vetor latente randômico do backbone.")
-
-        siamese_translator.eval()
+            if os.path.exists(model_path):
+                self._model.load_state_dict(
+                    torch.load(model_path, map_location=device, weights_only=True)
+                )
+            else:
+                print(f"[AVISO] Modelo Siamês ({ACOUSTIC_MODEL_BACKBONE}) não treinado encontrado. "
+                      "Usando pesos randômicos persistentes para consistência de extração.")
+            
+            self._model_backbone = ACOUSTIC_MODEL_BACKBONE
+            self._model.eval()
 
         with torch.no_grad():
-            normalized_vector = siamese_translator.forward_single_branch(mel_db)
+            normalized_vector = self._model.forward_single_branch(features_input)
 
         vector_1d = normalized_vector.cpu().numpy().flatten()
         return vector_1d

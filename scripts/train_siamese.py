@@ -17,11 +17,11 @@ from torch.utils.data import DataLoader
 
 from engine.siamese_net import (
     UniversalTranslatorSiameseNet,
-    MelSpectrogramPipeline,
+    AcousticTransformPipeline,
     InterspeciesTripletDataset,
     build_dataset_dictionary
 )
-from config import TRAINING_MODE
+from config import TRAINING_MODE, ACOUSTIC_MODEL_BACKBONE
 
 def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingles'):
     """Trains the Siamese Network."""
@@ -35,18 +35,40 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
             data_dict=data_dict,
             epochs=epochs,
             batch_size=batch_size,
-            anchor_lang=anchor_lang
+            anchor_lang=anchor_lang,
+            model_backbone=ACOUSTIC_MODEL_BACKBONE
         )
         return
 
     print("=== INICIANDO TREINAMENTO LOCAL DA REDE SIAMESA (FEW-SHOT LEARNING) ===")
+    print(f"[INFO] Backbone Acústico Selecionado: {ACOUSTIC_MODEL_BACKBONE}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Alocação Computacional: {device}")
 
+    # 2. Inicializa o pipeline de transformação
+    transform_pipeline = AcousticTransformPipeline(model_backbone=ACOUSTIC_MODEL_BACKBONE).to(device)
+    transform_pipeline.eval()
+
+    # Pré-computa características acústicas para acelerar o loop de treinamento (evita reprocessamento por época)
+    print("[INFO] Pré-computando características acústicas...")
+    precomputed_data = {}
+    with torch.no_grad():
+        for word, langs in data_dict.items():
+            precomputed_data[word] = {}
+            for lang, filepaths in langs.items():
+                precomputed_data[word][lang] = []
+                for path in filepaths:
+                    import librosa
+                    # Carrega o áudio e envia para o dispositivo
+                    waveform_np, _ = librosa.load(path, sr=16000, mono=True)
+                    waveform = torch.tensor(waveform_np, dtype=torch.float32).unsqueeze(0).to(device)
+                    feature = transform_pipeline(waveform)
+                    precomputed_data[word][lang].append(feature.squeeze(0).cpu())
+
     try:
         interspecies_dataset = InterspeciesTripletDataset(
-            data_dict=data_dict,
+            data_dict=precomputed_data,
             anchor_lang=anchor_lang,
             virtual_size=500 # Simula 500 épocas/tripletos para poucas amostras
         )
@@ -55,8 +77,6 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
         print("Dica: Grave pelo menos duas palavras em ambos os idiomas antes de treinar.")
         return
 
-    # 2. Prepara Pipeline e Dataloader
-    transform_pipeline = MelSpectrogramPipeline().to(device)
     triplet_loader = DataLoader(
         interspecies_dataset,
         batch_size=batch_size,
@@ -65,7 +85,10 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
     )
 
     # 3. Inicializa Rede Siamesa
-    siamese_translator = UniversalTranslatorSiameseNet(embedding_dim=1024).to(device)
+    siamese_translator = UniversalTranslatorSiameseNet(
+        embedding_dim=1024,
+        model_backbone=ACOUSTIC_MODEL_BACKBONE
+    ).to(device)
 
     # 4. Estruturação da Triplet Loss com Distância Cosseno
     def cosine_distance_fn(x, y):
@@ -78,7 +101,9 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
     )
 
     # 5. Otimizador AdamW
-    optimizer = optim.AdamW(siamese_translator.parameters(), lr=2e-4, weight_decay=1e-3)
+    # Se for AST, filtramos apenas os parâmetros que requerem gradiente (a Head de projeção)
+    trainable_params = [p for p in siamese_translator.parameters() if p.requires_grad]
+    optimizer = optim.AdamW(trainable_params, lr=2e-4, weight_decay=1e-3)
 
     # 6. Loop de Treinamento
     print(f"[INFO] Classes encontradas para treino: {interspecies_dataset.classes}")
@@ -90,17 +115,14 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
     for epoch in range(epochs):
         cumulative_epoch_loss = 0.0
 
-        for _, (anchor_audio, positive_audio, negative_audio) in enumerate(triplet_loader):
-            # Passa pelo transformador de Mel
-            anchor_mel = transform_pipeline(anchor_audio.to(device))
-            positive_mel = transform_pipeline(positive_audio.to(device))
-            negative_mel = transform_pipeline(negative_audio.to(device))
-
+        for _, (anchor_features, positive_features, negative_features) in enumerate(triplet_loader):
             optimizer.zero_grad()
 
-            # Forward Pass Siames
+            # Forward Pass Siames usando as características pré-computadas
             v_anchor, v_positive, v_negative = siamese_translator(
-                anchor_mel, positive_mel, negative_mel
+                anchor_features.to(device),
+                positive_features.to(device),
+                negative_features.to(device)
             )
 
             # Loss via Cosine Distance
@@ -120,11 +142,12 @@ def train_universal_translator_model(epochs=10, batch_size=8, anchor_lang='ingle
     models_dir = os.path.join(os.path.dirname(__file__), '..', 'models')
     os.makedirs(models_dir, exist_ok=True)
 
-    model_path = os.path.join(models_dir, 'siamese_universal_translator_1024d.pth')
+    model_filename = f'siamese_universal_translator_1024d_{ACOUSTIC_MODEL_BACKBONE}.pth'
+    model_path = os.path.join(models_dir, model_filename)
     torch.save(siamese_translator.state_dict(), model_path)
 
     print("\n[INFO] Estruturação Siamesa Exaurida com Sucesso Absoluto.")
-    print(f"[INFO] Modelo salvo em: {model_path}")
+    print(f"[INFO] Modelo ({ACOUSTIC_MODEL_BACKBONE}) salvo em: {model_path}")
 
 if __name__ == '__main__':
     train_universal_translator_model(anchor_lang='ingles')

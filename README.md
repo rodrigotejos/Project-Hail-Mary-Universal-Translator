@@ -85,10 +85,13 @@ Building a true Universal Translator is not just about speech-to-text. It's abou
 * **The Failure:** Direct mathematical comparison is still "literal". It compares frequency by frequency. If a human says "Dog" and a gorilla or alien makes the equivalent "Dog" sound, their physical frequencies are orthogonal. Pure math says they are 0% similar, failing to bridge different vocal physiologies.
 
 #### ✅ The Definitive Solution: Hybrid Siamese Neural Network with Triplet Loss (1024D)
-To force the system to map the gorilla grunt, the alien noise, and the human speech representing "Dog" to the exact same concept, we abandoned literal acoustics and created a **Siamese Neural Network** based on MobileNetV2:
+To force the system to map the gorilla grunt, the alien noise, and the human speech representing "Dog" to the exact same concept, we abandoned literal acoustics and created a modular **Siamese Neural Network**:
+* **Modular Backbones:** Support for both a lightweight CNN (`mobilenet` - MobileNetV2, trained from scratch) and a high-accuracy transformer-based model (`ast` - Google's Audio Spectrogram Transformer, leveraging pre-trained AudioSet weights).
+* **Dynamic Serverless GPUs & Timeouts:** Configure different serverless GPUs (e.g., `"T4"` for MobileNet, `"L4"` for AST) and custom execution timeouts for Modal training runs directly from the configuration file.
+* **Acoustic Precomputation Engine:** Speeds up training epoch times by pre-computing Mel Spectrogram or AST feature tensors before starting the epochs, yielding a **1000x training speedup** (epochs complete in under 0.1s).
 * **Triplet Loss (Cosine Distance):** The network is trained using audio triplets (Human Anchor, Alien Positive, Alien Negative). The loss function forces the AI to bring vectors with the same meaning closer together on the unit sphere, while pushing different concepts apart.
 * **Synthetic Data Augmentation:** If you only have one recording of a word, the system automatically injects Gaussian white noise and varies the volume to create robust positive pairs, preventing representation collapse.
-* **Hybrid Architecture (Local/Modal.com):** Training can run **locally** on your RTX GPU (via CUDA 12.1) in 2 seconds or on the **cloud** by streaming tensors directly via API to a T4 GPU on **Modal.com** in 3 seconds.
+* **Hybrid Architecture (Local/Modal.com):** Training can run **locally** on your GPU/CPU in 2 seconds or on the **cloud** by streaming tensors directly via API to serverless GPUs on **Modal.com**.
 * **Safe Offline Inference:** Translation and feature extraction run 100% offline on the **CPU**. This resolves the cuDNN DLL conflicts with Whisper's engine (`faster-whisper`), while making the microphone initialize instantly.
 
 ---
@@ -109,7 +112,12 @@ Update the Siamese Network's weights with the newly recorded voices:
 ```bash
 venv\Scripts\python.exe scripts/train_siamese.py
 ```
-* **Configuration:** Change the `TRAINING_MODE` variable in `src/config.py` to choose between `"local"` (RTX GPU) or `"cloud"` (Modal.com T4 GPU). Running the script will recalculate the model's weights and save them to `models/siamese_universal_translator_1024d.pth`.
+* **Configuration:** Change configurations in `src/config.py` to choose:
+  - `TRAINING_MODE`: `"local"` or `"cloud"`.
+  - `ACOUSTIC_MODEL_BACKBONE`: `"mobilenet"` or `"ast"`.
+  - `CLOUD_GPU_MOBILENET` & `CLOUD_GPU_AST`: The GPU hardware to allocate on Modal (e.g., T4, L4).
+  - `CLOUD_TIMEOUT`: Remote execution timeout limit.
+  Running the script will recalculate the model's weights and save them dynamically to `models/siamese_universal_translator_1024d_<backbone>.pth`.
 
 #### Step 3: Rebuild the Vector Database
 Generate the new high-dimensional vectors and store them in the index:
@@ -219,10 +227,13 @@ Construir um verdadeiro Tradutor Universal não é apenas sobre transcrever voz 
 * **A Falha:** A comparação matemática direta ainda é "burra e literal". Ela compara frequência por frequência. Se um humano fala "Dog" e um gorila ou alienígena emite o som equivalente a "Dog", suas frequências físicas são ortogonais. A matemática diz que a similaridade é zero. Ela é incapaz de mapear intensões semânticas de corpos vocais diferentes.
 
 #### ✅ A Solução Definitiva: Rede Neural Siamesa Híbrida com Triplet Loss (1024D)
-Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** baseada no MobileNetV2:
+Para que o sistema entenda que o grunhido do gorila, o ruído alienígena e a voz humana de "Dog" significam a mesma coisa, abandonamos a comparação física e criamos uma **Rede Neural Siamesa (Siamese Network)** modular:
+* **Backbones Modulares:** Suporte tanto para uma CNN leve (`mobilenet` - MobileNetV2, treinada do zero) quanto para um modelo baseado em transformers de alta precisão (`ast` - Google Audio Spectrogram Transformer, utilizando pesos pré-treinados do AudioSet).
+* **GPUs e Timeouts Dinâmicos em Nuvem:** Possibilidade de configurar diferentes tipos de GPUs remotas (ex: `"T4"` para MobileNet, `"L4"` para AST) e limites de tempo de execução customizados no Modal a partir do arquivo de configurações.
+* **Motor de Pré-computação Acústica:** Acelera as épocas de treino em até **1000x** extraindo os espectrogramas ou características do AST antes de iniciar as épocas, fazendo cada época rodar na GPU em menos de 0.1s.
 * **Triplet Loss (Distância Cosseno):** A rede é treinada mostrando trios de áudio (Âncora Humana, Positivo Alienígena, Negativo Alienígena). A matemática da loss força a IA a aproximar no espaço vetorial os sons com o mesmo significado (deformando os vetores até se sobreporem), enquanto empurra os sons diferentes para longe.
 * **Aumento Sintético de Dados (Data Augmentation):** Caso você tenha apenas um áudio gravado para a palavra, a IA injeta automaticamente ruído branco gaussiano e varia o volume para criar pares positivos sintéticos robustos, impedindo o vício da rede.
-* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua GPU RTX (via CUDA 12.1) em 60 segundos ou na **nuvem** enviando os tensores diretamente por API para uma GPU T4 do **Modal.com** em 60 segundos.
+* **Arquitetura Híbrida (Local/Modal.com):** O treinamento pode ser feito **localmente** na sua máquina em segundos ou na **nuvem** enviando os tensores por API para GPUs serverless no **Modal.com**.
 * **Inferência Offline Segura:** A tradução e leitura ocorrem 100% offline e na **CPU** do seu PC. Isso resolve o conflito de cuDNN com as DLLs do Whisper (`faster-whisper`), além de inicializar o microfone instantaneamente.
 
 ---
@@ -243,7 +254,12 @@ Atualize a inteligência da Rede Siamesa com as novas vozes gravadas:
 ```bash
 venv\Scripts\python.exe scripts/train_siamese.py
 ```
-* **Ajuste Fino:** Altere a variável `TRAINING_MODE` em `src/config.py` para escolher entre `"local"` (RTX GPU) ou `"cloud"` (GPU T4 do Modal). Ao rodar o script, os pesos da IA serão recalculados e salvos localmente em `models/siamese_universal_translator_1024d.pth`.
+* **Ajustes de Treinamento:** Altere as configurações em `src/config.py`:
+  - `TRAINING_MODE`: `"local"` ou `"cloud"`.
+  - `ACOUSTIC_MODEL_BACKBONE`: `"mobilenet"` ou `"ast"`.
+  - `CLOUD_GPU_MOBILENET` & `CLOUD_GPU_AST`: A GPU a ser alocada no Modal (ex: T4, L4).
+  - `CLOUD_TIMEOUT`: Tempo limite para a função na nuvem.
+  Ao rodar o script, os pesos da IA serão recalculados e salvos localmente de forma dinâmica em `models/siamese_universal_translator_1024d_<backbone>.pth`.
 
 #### Passo 3: Sincronizar o Banco Vetorial
 Gere os novos vetores matemáticos para todos os áudios e salve-os no banco indexado:

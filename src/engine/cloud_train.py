@@ -8,45 +8,76 @@ from torch import nn
 from torch import optim
 import torch.nn.functional as F
 
+from config import CLOUD_GPU_MOBILENET, CLOUD_GPU_AST, CLOUD_TIMEOUT
+
 # 1. Configuração do ambiente remoto do Modal
 app = modal.App("phm-universal-translator")
 
-# Imagem Docker com dependências otimizadas para GPU T4
-docker_image = modal.Image.debian_slim().pip_install(
-    "torch==2.5.1",
-    "torchvision==0.20.1",
-    "torchaudio==2.5.1",
+# Dynamically resolve local 'src' directory to mount it in the container
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+# Use official PyTorch image to avoid downloading large PyTorch binaries from scratch,
+# saving build time and avoiding network timeouts.
+docker_image = modal.Image.from_registry(
+    "pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime"
+).pip_install(
+    "torchaudio",
+    "torchvision",
     "librosa",
-    "numpy",
-    "scipy"
+    "scipy",
+    "transformers==4.41.2"
+).env(
+    {"PYTHONPATH": "/root/src"}
+).add_local_dir(
+    src_dir,
+    remote_path="/root/src"
 )
 
 # 2. Definição da Função na Nuvem (Executada no Modal)
-@app.function(image=docker_image, gpu="T4", timeout=600)
-def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang='ingles'):
+# A GPU e o timeout são configurados e injetados dinamicamente via .with_options() no orquestrador.
+@app.function(image=docker_image)
+def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang='ingles', model_backbone="mobilenet"):
     """
-    Função executada remotamente em uma GPU T4 no Modal.
+    Função executada remotamente em uma GPU no Modal.
     Recebe os tensores de áudio em memória, treina a rede siamesa e retorna o state_dict.
     """
     # pylint: disable=too-many-locals, import-outside-toplevel
+    import sys
+    sys.path.insert(0, "/root/src")
+
     from torch.utils.data import DataLoader
     from engine.siamese_net import (
         UniversalTranslatorSiameseNet,
-        MelSpectrogramPipeline,
+        AcousticTransformPipeline,
         InterspeciesTripletDataset
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[NUVEM] Iniciando treinamento no Modal. Acelerador ativo: {device}")
+    print(f"[NUVEM] Backbone selecionado: {model_backbone}")
 
-    # Inicializa dataset passando os tensores em memória enviados pelo cliente
+    transform_pipeline = AcousticTransformPipeline(model_backbone=model_backbone).to(device)
+    transform_pipeline.eval()
+
+    # Pré-computa características acústicas na nuvem para otimização de performance (evita CPU feature extraction por época)
+    print("[NUVEM] Pré-computando características acústicas...")
+    precomputed_data = {}
+    with torch.no_grad():
+        for word, langs in in_memory_data.items():
+            precomputed_data[word] = {}
+            for lang, waveforms in langs.items():
+                precomputed_data[word][lang] = []
+                for wave in waveforms:
+                    feature = transform_pipeline(wave.to(device))
+                    precomputed_data[word][lang].append(feature.squeeze(0).cpu())
+
+    # Inicializa dataset passando os tensores pré-computados
     interspecies_dataset = InterspeciesTripletDataset(
-        data_dict=in_memory_data,
+        data_dict=precomputed_data,
         anchor_lang=anchor_lang,
         virtual_size=500
     )
 
-    transform_pipeline = MelSpectrogramPipeline().to(device)
     triplet_loader = DataLoader(
         interspecies_dataset,
         batch_size=batch_size,
@@ -54,7 +85,10 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
         num_workers=0
     )
 
-    siamese_translator = UniversalTranslatorSiameseNet(embedding_dim=1024).to(device)
+    siamese_translator = UniversalTranslatorSiameseNet(
+        embedding_dim=1024,
+        model_backbone=model_backbone
+    ).to(device)
 
     def cosine_distance_fn(x, y):
         return 1.0 - F.cosine_similarity(x, y) # pylint: disable=not-callable
@@ -65,19 +99,18 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
         reduction='mean'
     )
 
-    optimizer = optim.AdamW(siamese_translator.parameters(), lr=2e-4, weight_decay=1e-3)
+    trainable_params = [p for p in siamese_translator.parameters() if p.requires_grad]
+    optimizer = optim.AdamW(trainable_params, lr=2e-4, weight_decay=1e-3)
 
     siamese_translator.train()
     for epoch in range(epochs):
         cumulative_epoch_loss = 0.0
-        for anchor_audio, positive_audio, negative_audio in triplet_loader:
-            anchor_mel = transform_pipeline(anchor_audio.to(device))
-            positive_mel = transform_pipeline(positive_audio.to(device))
-            negative_mel = transform_pipeline(negative_audio.to(device))
-
+        for anchor_features, positive_features, negative_features in triplet_loader:
             optimizer.zero_grad()
             v_anchor, v_positive, v_negative = siamese_translator(
-                anchor_mel, positive_mel, negative_mel
+                anchor_features.to(device),
+                positive_features.to(device),
+                negative_features.to(device)
             )
             loss = loss_function(v_anchor, v_positive, v_negative)
             loss.backward()
@@ -93,14 +126,15 @@ def train_siamese_on_modal(in_memory_data, epochs=10, batch_size=8, anchor_lang=
 
 
 # 3. Função Orquestradora Local
-def run_cloud_training(data_dict, epochs=10, batch_size=8, anchor_lang='ingles'):
+def run_cloud_training(data_dict, epochs=10, batch_size=8, anchor_lang='ingles', model_backbone="mobilenet", is_entrypoint=False):
     """
     Função executada localmente. Carrega os arquivos físicos de áudio da pasta local,
     converte em tensores de memória e envia para o Modal via chamada de API.
     """
     # pylint: disable=too-many-locals, import-outside-toplevel
     import librosa
-    print("\n=== INICIANDO CONEXÃO E ENVIO PARA O MODAL (NUVEM COM GPU T4) ===")
+    print("\n=== INICIANDO CONEXÃO E ENVIO PARA O MODAL ===")
+    print(f"[LOCAL] Backbone solicitado para o Modal: {model_backbone}")
     print("[LOCAL] Carregando arquivos físicos em memória...")
 
     # Converte os caminhos locais em tensores de áudio antes de enviar
@@ -117,22 +151,63 @@ def run_cloud_training(data_dict, epochs=10, batch_size=8, anchor_lang='ingles')
                 ).unsqueeze(0)
                 in_memory_data[word][lang].append(waveform_tensor)
 
-    print("[LOCAL] Estabelecendo conexão com o Modal e enviando tensores...")
+    gpu_type = CLOUD_GPU_AST if model_backbone == "ast" else CLOUD_GPU_MOBILENET
+    timeout = CLOUD_TIMEOUT
+    
+    print(f"[LOCAL] Estabelecendo conexão com o Modal (GPU: {gpu_type}, Timeout: {timeout}s)...")
 
-    # Executa a função na nuvem e espera pelo retorno do state_dict
-    with app.run():
-        state_dict = train_siamese_on_modal.remote(
+    # Executa a função na nuvem com configurações dinâmicas e espera pelo retorno do state_dict
+    if is_entrypoint:
+        state_dict = train_siamese_on_modal.with_options(
+            gpu=gpu_type,
+            timeout=timeout
+        ).remote(
             in_memory_data=in_memory_data,
             epochs=epochs,
             batch_size=batch_size,
-            anchor_lang=anchor_lang
+            anchor_lang=anchor_lang,
+            model_backbone=model_backbone
         )
+    else:
+        with app.run():
+            state_dict = train_siamese_on_modal.with_options(
+                gpu=gpu_type,
+                timeout=timeout
+            ).remote(
+                in_memory_data=in_memory_data,
+                epochs=epochs,
+                batch_size=batch_size,
+                anchor_lang=anchor_lang,
+                model_backbone=model_backbone
+            )
 
     # Salva o arquivo de pesos recebido da nuvem localmente
     models_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'models'))
     os.makedirs(models_dir, exist_ok=True)
-    model_path = os.path.join(models_dir, 'siamese_universal_translator_1024d.pth')
+    
+    model_filename = f'siamese_universal_translator_1024d_{model_backbone}.pth'
+    model_path = os.path.join(models_dir, model_filename)
 
     torch.save(state_dict, model_path)
     print(f"\n[LOCAL] Modelo recebido da nuvem e salvo em: {model_path}")
     print("[LOCAL] Treinamento Remoto Concluído com Sucesso!")
+
+
+@app.local_entrypoint()
+def main():
+    import sys
+    # Garante que a pasta src está no path
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    
+    from engine.siamese_net import build_dataset_dictionary
+    from config import ACOUSTIC_MODEL_BACKBONE
+    
+    data_dict = build_dataset_dictionary()
+    run_cloud_training(
+        data_dict=data_dict,
+        epochs=10,
+        batch_size=8,
+        anchor_lang='ingles',
+        model_backbone=ACOUSTIC_MODEL_BACKBONE,
+        is_entrypoint=True
+    )

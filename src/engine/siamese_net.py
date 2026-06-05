@@ -115,25 +115,54 @@ class InterspeciesTripletDataset(Dataset):
 # ==============================================================================
 # 2. Pipeline de Compressão Espectro-Temporal Transponível
 # ==============================================================================
-class MelSpectrogramPipeline(nn.Module):
-    """Pipeline that transforms audio into Mel Spectrograms."""
-    def __init__(self, sample_rate=16000, n_mels=128, n_fft=1024, hop_length=256):
+# ==============================================================================
+# 2. Pipeline de Compressão Espectro-Temporal Transponível
+# ==============================================================================
+class AcousticTransformPipeline(nn.Module):
+    """Pipeline that transforms audio into Mel Spectrograms or AST Input Values."""
+    def __init__(self, model_backbone="mobilenet", sample_rate=16000):
         super().__init__()
-        self.mel_extractor = T.MelSpectrogram(
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            hop_length=hop_length,
-            n_mels=n_mels,
-            power=2.0
-        )
-        self.amplitude_to_db = T.AmplitudeToDB(stype='power', top_db=80)
+        self.model_backbone = model_backbone
+        self.sample_rate = sample_rate
+
+        if model_backbone == "mobilenet":
+            self.mel_extractor = T.MelSpectrogram(
+                sample_rate=sample_rate,
+                n_fft=1024,
+                hop_length=256,
+                n_mels=128,
+                power=2.0
+            )
+            self.amplitude_to_db = T.AmplitudeToDB(stype='power', top_db=80)
+        elif model_backbone == "ast":
+            from transformers import ASTFeatureExtractor
+            self.extractor = ASTFeatureExtractor()
 
     def forward(self, waveform):
-        """Converts waveform to Mel Spectrogram."""
-        # Ajeita dimensões para a convolução (adicionando Batch ou Channel)
-        mel_power = self.mel_extractor(waveform)
-        mel_db = self.amplitude_to_db(mel_power)
-        return mel_db
+        """Converts waveform to appropriate model features."""
+        if self.model_backbone == "mobilenet":
+            # Ajeita dimensões para a convolução (adicionando Batch ou Channel)
+            mel_power = self.mel_extractor(waveform)
+            mel_db = self.amplitude_to_db(mel_power)
+            return mel_db
+        elif self.model_backbone == "ast":
+            device = waveform.device
+            # Flatten to [batch, num_samples] if input is [batch, 1, num_samples]
+            if waveform.ndim == 3:
+                waveform = waveform.squeeze(1)
+            
+            # Converter para numpy array (necessário para o extractor da Hugging Face)
+            waveforms_np = waveform.cpu().numpy()
+            
+            # O ASTFeatureExtractor espera uma lista de arrays 1D
+            inputs = self.extractor(list(waveforms_np), sampling_rate=16000, return_tensors="pt")
+            return inputs.input_values.to(device)
+
+
+# Alias for backwards compatibility
+class MelSpectrogramPipeline(AcousticTransformPipeline):
+    def __init__(self, sample_rate=16000, n_mels=128, n_fft=1024, hop_length=256):
+        super().__init__(model_backbone="mobilenet", sample_rate=sample_rate)
 
 
 # ==============================================================================
@@ -141,45 +170,72 @@ class MelSpectrogramPipeline(nn.Module):
 # ==============================================================================
 class UniversalTranslatorSiameseNet(nn.Module):
     """
-    MobileNetV2 adaptada para tradução semântica de áudios brutos.
+    Rede Siamesa modular suportando MobileNetV2 ou Google AST (Audio Spectrogram Transformer).
     """
-    def __init__(self, embedding_dim=1024):
+    def __init__(self, embedding_dim=1024, model_backbone="mobilenet"):
         super().__init__()
+        self.model_backbone = model_backbone
 
-        # Backbone ignorando pesos pré-treinados para focar nas assinaturas alienígenas
-        self.backbone = mobilenet_v2(weights=None)
+        if model_backbone == "mobilenet":
+            # Backbone ignorando pesos pré-treinados para focar nas assinaturas alienígenas
+            self.backbone = mobilenet_v2(weights=None)
 
-        # Modificação A: 1 Canal de entrada (Espectrograma monocromático)
-        original_initial_conv = self.backbone.features[0][0]
-        self.backbone.features[0][0] = nn.Conv2d(
-            in_channels=1,
-            out_channels=original_initial_conv.out_channels,
-            kernel_size=original_initial_conv.kernel_size,
-            stride=original_initial_conv.stride,
-            padding=original_initial_conv.padding,
-            bias=False
-        )
+            # Modificação A: 1 Canal de entrada (Espectrograma monocromático)
+            original_initial_conv = self.backbone.features[0][0]
+            self.backbone.features[0][0] = nn.Conv2d(
+                in_channels=1,
+                out_channels=original_initial_conv.out_channels,
+                kernel_size=original_initial_conv.kernel_size,
+                stride=original_initial_conv.stride,
+                padding=original_initial_conv.padding,
+                bias=False
+            )
 
-        # Remove classificador final das 1000 classes de imagem
-        self.backbone.classifier = nn.Identity()
+            # Remove classificador final das 1000 classes de imagem
+            self.backbone.classifier = nn.Identity()
 
-        backbone_latent_channels = 1280
+            backbone_latent_channels = 1280
 
-        # Modificação B: Projection Head para 1024D (ChromaDB)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.projection_bottleneck = nn.Sequential(
-            nn.Linear(backbone_latent_channels, 1024),
-            nn.BatchNorm1d(1024),
-            nn.GELU(),
-            nn.Linear(1024, embedding_dim)
-        )
+            # Modificação B: Projection Head para 1024D (ChromaDB)
+            self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
+            self.projection_bottleneck = nn.Sequential(
+                nn.Linear(backbone_latent_channels, 1024),
+                nn.BatchNorm1d(1024),
+                nn.GELU(),
+                nn.Linear(1024, embedding_dim)
+            )
+        elif model_backbone == "ast":
+            from transformers import ASTModel
+            # Carrega o modelo AST pré-treinado do Google no AudioSet
+            self.backbone = ASTModel.from_pretrained('MIT/ast-finetuned-audioset-10-10-0.4593')
+            
+            # Congela os pesos do AST para usá-lo apenas como extrator de características
+            for param in self.backbone.parameters():
+                param.requires_grad = False
+                
+            # AST hidden_size é 768. O token CLS tem tamanho [batch, 768]
+            self.projection_bottleneck = nn.Sequential(
+                nn.Linear(768, 1024),
+                nn.BatchNorm1d(1024),
+                nn.GELU(),
+                nn.Linear(1024, embedding_dim)
+            )
+        else:
+            raise ValueError(f"Backbone acústico desconhecido: {model_backbone}")
 
     def forward_single_branch(self, audio_tensor):
         """ Executa uma vertente da rede Siamesa """
-        features_2d = self.backbone.features(audio_tensor)
-        pooled_tensor = self.adaptive_pool(features_2d)
-        flattened_vector = torch.flatten(pooled_tensor, 1)
-        projection_vector = self.projection_bottleneck(flattened_vector)
+        if self.model_backbone == "mobilenet":
+            features_2d = self.backbone.features(audio_tensor)
+            pooled_tensor = self.adaptive_pool(features_2d)
+            flattened_vector = torch.flatten(pooled_tensor, 1)
+            projection_vector = self.projection_bottleneck(flattened_vector)
+        elif self.model_backbone == "ast":
+            # Para o AST, a entrada é [batch, 1024, 128]
+            outputs = self.backbone(input_values=audio_tensor)
+            # Extrai o token CLS na posição 0
+            cls_token = outputs.last_hidden_state[:, 0, :]
+            projection_vector = self.projection_bottleneck(cls_token)
 
         # Modificação C: L2-Norm Obrigatória para adequação matemática da similaridade Cosseno
         normalized_vector = F.normalize(projection_vector, p=2, dim=1)
