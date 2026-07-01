@@ -96,6 +96,16 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         
         self.page.update()
 
+    def get_available_languages(self):
+        """Loads available target languages from subfolders under 'linguagens/'."""
+        langs = ["clingo", "ingles"]
+        if os.path.exists("linguagens"):
+            for item in os.listdir("linguagens"):
+                if os.path.isdir(os.path.join("linguagens", item)):
+                    if item not in langs:
+                        langs.append(item)
+        return langs
+
     def create_ui_elements(self):
         """Initializes and styles all Flet components into a 3-column widescreen grid."""
         # --- HEADER ---
@@ -111,6 +121,31 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
 
         # --- LEFT PANEL: LEARNING MODULE ---
+        # Language selections
+        self.lang_dropdown = ft.Dropdown(
+            label="Idioma Alvo",
+            options=[ft.dropdown.Option(l) for l in self.get_available_languages()],
+            value=self.target_language,
+            expand=2
+        )
+        self.lang_dropdown.on_change = self.on_lang_change
+
+        self.new_lang_input = ft.TextField(
+            hint_text="Criar...",
+            bgcolor="#111",
+            border_color=THEME["border_color"],
+            color="white",
+            text_size=12,
+            expand=1
+        )
+
+        self.add_lang_btn = ft.IconButton(
+            icon=ft.Icons.ADD,
+            icon_color=THEME["accent_color"],
+            tooltip="Adicionar Novo Idioma"
+        )
+        self.add_lang_btn.on_click = self.add_new_language
+
         self.vu_bars = [
             ft.Container(width=6, height=10, bgcolor="#1a1a1a", border_radius=2)
             for _ in range(16)
@@ -174,6 +209,13 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         left_content = ft.Column([
             ft.Text("MÓDULO DE APRENDIZADO", color=THEME["accent_color"], size=15, weight="bold"),
             ft.Divider(color=THEME["border_color"], height=1),
+            
+            # Language selection row
+            ft.Row([
+                self.lang_dropdown,
+                self.new_lang_input,
+                self.add_lang_btn
+            ], spacing=5),
             
             # Audio Waveform visualizer container
             ft.Container(
@@ -523,6 +565,27 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         chat_column.controls.append(bubble_row)
         self.page.update()
 
+    # --- LANGUAGE SELECTION HANDLERS ---
+    def on_lang_change(self, _e):
+        """Update active target language on selection."""
+        self.target_language = self.lang_dropdown.value
+        self.log_to_console(f"[SISTEMA] Idioma alvo alterado para: '{self.target_language.upper()}'\n")
+
+    def add_new_language(self, _e):
+        """Creates a new target language, creates directories, and adds to dropdown options."""
+        new_lang = self.new_lang_input.value.strip().lower()
+        if new_lang:
+            os.makedirs(f"linguagens/{new_lang}", exist_ok=True)
+            self.target_language = new_lang
+            self.new_lang_input.value = ""
+            
+            # Reload dropdown
+            self.lang_dropdown.options = [ft.dropdown.Option(l) for l in self.get_available_languages()]
+            self.lang_dropdown.value = new_lang
+            
+            self.log_to_console(f"[SISTEMA] Novo idioma criado e selecionado: '{new_lang.upper()}'\n")
+            self.page.update()
+
     # --- LEARNING MODULE LOGIC ---
     def on_text_change(self, _e):
         """Update the semantical concept word display dynamically as the user types."""
@@ -600,6 +663,12 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         try:
             # Record via AudioProcessor
             audio = self.translator.audio_processor.record_audio(duration=4.0)
+            
+            # Normalize the captured audio array immediately to ensure loud and clear playbacks
+            max_val = np.max(np.abs(audio))
+            if max_val > 0:
+                audio = audio / max_val
+            
             self.recorded_alien_audio = audio
             
             # Enable play and confirm buttons
@@ -685,7 +754,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.page.update()
 
         try:
-            self.log_to_console(f"[APRENDIZADO] Registrando '{word}' nas bases locais...\n")
+            self.log_to_console(f"[APRENDIZADO] Registrando '{word}' nas bases locais para o idioma '{self.target_language.upper()}'...\n")
             
             # 1. Save physical audio
             filepath = self.translator.audio_processor.save_audio(
@@ -864,6 +933,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         for path in paths:
             try:
                 audio, sr = librosa.load(path, sr=22050)
+                # Normalize audio segment so they sound uniform and audible
+                max_val = np.max(np.abs(audio))
+                if max_val > 0:
+                    audio = audio / max_val
                 sd.play(audio, sr)
                 sd.wait()
                 time.sleep(0.15)  # Brief silence between words
