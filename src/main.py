@@ -17,6 +17,15 @@ from ui.theme import THEME, get_theme
 from engine.translator import UniversalTranslator
 from config import TRAINING_MODE, ACOUSTIC_MODEL_BACKBONE
 
+def border_all(width: float, color: str):
+    """Helper to create a 4-sided border in backward-compatible Flet syntax."""
+    return ft.border.Border(
+        top=ft.BorderSide(width, color),
+        right=ft.BorderSide(width, color),
+        bottom=ft.BorderSide(width, color),
+        left=ft.BorderSide(width, color)
+    )
+
 class TranslatorApp:  # pylint: disable=too-many-instance-attributes
     """Main application class for the Universal Translator."""
     def __init__(self):
@@ -113,9 +122,9 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             icon=ft.Icons.PLAY_ARROW,
             bgcolor=THEME["accent_color"],
             color="black",
-            disabled=True,
-            on_click=self.play_last_audio
+            disabled=True
         )
+        self.play_button.on_click = self.play_last_audio
 
         self.word_display = ft.Text(
             "NENHUMA",
@@ -131,35 +140,36 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             bgcolor="#111",
             border_color=THEME["border_color"],
             color="white",
-            on_submit=self.on_text_submit,
             text_size=14
         )
+        self.text_input.on_submit = self.on_text_submit
+        self.text_input.on_change = self.on_text_change
 
         self.mic_button = ft.IconButton(
             icon=ft.Icons.MIC,
             icon_color=THEME["accent_color"],
             icon_size=24,
             tooltip="Falar palavra em Português",
-            disabled=True,
-            on_click=self.on_mic_click
+            disabled=True
         )
+        self.mic_button.on_click = self.on_mic_click
 
         self.record_alien_btn = ft.ElevatedButton(
             "GRAVAR SOM ALIENÍGENA",
             icon=ft.Icons.FIBER_MANUAL_RECORD,
             bgcolor="#ff2a2a",
-            color="white",
-            on_click=self.record_alien_sound_start
+            color="white"
         )
+        self.record_alien_btn.on_click = self.record_alien_sound_start
 
         self.save_word_button = ft.IconButton(
             icon=ft.Icons.SAVE,
             icon_color="green",
             icon_size=28,
             tooltip="Salvar e Mapear Palavra",
-            disabled=True,
-            on_click=self.save_word
+            disabled=True
         )
+        self.save_word_button.on_click = self.save_word
 
         left_content = ft.Column([
             ft.Text("MÓDULO DE APRENDIZADO", color=THEME["accent_color"], size=15, weight="bold"),
@@ -173,7 +183,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 height=110,
                 bgcolor="#0e0e0e",
-                border=ft.border.all(1, "#333"),
+                border=border_all(1, "#333"),
                 border_radius=5,
                 padding=10
             ),
@@ -184,7 +194,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             ft.Text("CONCEITO SEMÂNTICO EM FOCO:", size=11, color="#888", weight="bold"),
             ft.Container(
                 content=self.word_display,
-                alignment=ft.alignment.center,
+                alignment=ft.alignment.Alignment(0, 0),
                 height=60,
                 bgcolor="#0d0e15",
                 border_radius=5
@@ -207,7 +217,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.chat_container = ft.Container(
             height=460,
             bgcolor="#040406",
-            border=ft.border.all(1, "#222"),
+            border=border_all(1, "#222"),
             border_radius=5,
             padding=10,
             content=ft.Column([], scroll=ft.ScrollMode.AUTO)
@@ -218,37 +228,37 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             bgcolor="#111",
             border_color=THEME["border_color"],
             color="white",
-            on_submit=self.on_chat_submit,
             text_size=13,
             expand=True
         )
+        self.chat_input.on_submit = self.on_chat_submit
 
         self.chat_mic_button = ft.IconButton(
             icon=ft.Icons.MIC,
             icon_color=THEME["accent_color"],
             icon_size=20,
             tooltip="Falar mensagem (Human -> Alien)",
-            disabled=True,
-            on_click=self.on_chat_mic_click
+            disabled=True
         )
+        self.chat_mic_button.on_click = self.on_chat_mic_click
 
         self.chat_send_button = ft.IconButton(
             icon=ft.Icons.SEND,
             icon_color=THEME["accent_color"],
             icon_size=20,
             tooltip="Enviar mensagem",
-            disabled=True,
-            on_click=self.on_chat_send_click
+            disabled=True
         )
+        self.chat_send_button.on_click = self.on_chat_send_click
 
         self.alien_mic_btn = ft.IconButton(
             icon=ft.Icons.SPEAKER_PHONE,
             icon_color=THEME["status_color"],
             icon_size=22,
             tooltip="Ouvir & Traduzir Som Alien (Alien -> Human)",
-            disabled=True,
-            on_click=self.on_alien_mic_click
+            disabled=True
         )
+        self.alien_mic_btn.on_click = self.on_alien_mic_click
 
         right_content = ft.Column([
             ft.Text("CANAL DE DIÁLOGO INTERESPÉCIES", color=THEME["accent_color"], size=15, weight="bold"),
@@ -272,9 +282,9 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             value=ACOUSTIC_MODEL_BACKBONE,
             bgcolor="#111",
             border_color=THEME["border_color"],
-            color="white",
-            on_change=self.save_config
+            color="white"
         )
+        self.backbone_dropdown.on_change = self.save_config
 
         self.train_mode_dropdown = ft.Dropdown(
             label="Ambiente de Treino",
@@ -285,27 +295,27 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             value=TRAINING_MODE,
             bgcolor="#111",
             border_color=THEME["border_color"],
-            color="white",
-            on_change=self.save_config
+            color="white"
         )
+        self.train_mode_dropdown.on_change = self.save_config
 
         self.train_button = ft.ElevatedButton(
             "EXECUTAR TREINAMENTO SIAMES",
             icon=ft.Icons.PLAY_CIRCLE_FILL,
             bgcolor=THEME["status_color"],
             color="black",
-            disabled=True,
-            on_click=lambda _: self.run_script_in_console("train_siamese.py", ["--epochs", "10"])
+            disabled=True
         )
+        self.train_button.on_click = lambda _: self.run_script_in_console("train_siamese.py", ["--epochs", "10"])
 
         self.sync_button = ft.ElevatedButton(
             "SINCRONIZAR CHROMADB",
             icon=ft.Icons.SYNC,
             bgcolor=THEME["accent_color"],
             color="black",
-            disabled=True,
-            on_click=lambda _: self.run_script_in_console("migrate_to_vector_db.py")
+            disabled=True
         )
+        self.sync_button.on_click = lambda _: self.run_script_in_console("migrate_to_vector_db.py")
 
         self.console_column = ft.Column(
             [],
@@ -317,7 +327,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             content=self.console_column,
             height=280,
             bgcolor="#000000",
-            border=ft.border.all(1, THEME["border_color"]),
+            border=border_all(1, THEME["border_color"]),
             border_radius=5,
             padding=8
         )
@@ -326,9 +336,9 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             icon=ft.Icons.DELETE_SWEEP,
             icon_color="#ff2a2a",
             icon_size=20,
-            tooltip="Limpar Console",
-            on_click=self.clear_console
+            tooltip="Limpar Console"
         )
+        clear_console_btn.on_click = self.clear_console
 
         telemetry_content = ft.Column([
             ft.Text("TELEMETRIA NEURAL & BANCO", color=THEME["accent_color"], size=15, weight="bold"),
@@ -353,7 +363,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                     # Column 1
                     ft.Container(
                         content=left_content,
-                        border=ft.border.all(1, THEME["border_color"]),
+                        border=border_all(1, THEME["border_color"]),
                         border_radius=6,
                         padding=12,
                         expand=3
@@ -361,7 +371,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                     # Column 2
                     ft.Container(
                         content=right_content,
-                        border=ft.border.all(1, THEME["border_color"]),
+                        border=border_all(1, THEME["border_color"]),
                         border_radius=6,
                         padding=12,
                         expand=4
@@ -369,7 +379,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                     # Column 3
                     ft.Container(
                         content=telemetry_content,
-                        border=ft.border.all(1, THEME["border_color"]),
+                        border=border_all(1, THEME["border_color"]),
                         border_radius=6,
                         padding=12,
                         expand=3
@@ -377,7 +387,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.START, expand=True)
             ]),
             padding=15,
-            border=ft.border.all(2, THEME["border_color"]),
+            border=border_all(2, THEME["border_color"]),
             border_radius=8,
             bgcolor="#050505",
             expand=True
@@ -497,10 +507,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 text_control
             ], spacing=2),
             bgcolor=bubble_color,
-            border=ft.border.all(1, border_color),
+            border=border_all(1, border_color),
             padding=9,
             border_radius=8,
-            margin=ft.margin.only(bottom=5),
+            margin=ft.margin.Margin(bottom=5),
             width=280
         )
         
@@ -514,13 +524,17 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.page.update()
 
     # --- LEARNING MODULE LOGIC ---
+    def on_text_change(self, _e):
+        """Update the semantical concept word display dynamically as the user types."""
+        word = self.text_input.value.strip().upper()
+        self.word_display.value = word if word else "NENHUMA"
+        self.page.update()
+
     def on_text_submit(self, _e):
-        """Handle manual text input for learning."""
+        """Handle manual text input for learning (pressing Enter)."""
         word = self.text_input.value.strip().upper()
         if word:
             self.word_display.value = word
-            self.text_input.value = ""
-            self.log_to_console(f"[APRENDIZADO] Semântica definida: '{word}'. Grave o áudio correspondente.\n")
             self.page.update()
 
     def on_mic_click(self, _e):
@@ -543,6 +557,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
             if word:
                 self.word_display.value = word
+                self.text_input.value = ""
                 self.log_to_console(f"[APRENDIZADO] Transcrição bem sucedida: '{word}'\n")
             else:
                 self.word_display.value = "NÃO DETECTADO"
@@ -557,6 +572,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
     def record_alien_sound_start(self, _e):
         """Starts recording alien sound for learned word mapping."""
+        # Fallback to apply text input value
+        if self.word_display.value in ("NENHUMA", "NÃO DETECTADO", "ERRO") and self.text_input.value.strip():
+            self.word_display.value = self.text_input.value.strip().upper()
+            
         word = self.word_display.value.strip()
         if not word or word in ("NENHUMA", "NÃO DETECTADO", "ERRO"):
             self.log_to_console("[AVISO] Defina um conceito em foco antes de gravar o som correspondente!\n")
@@ -697,6 +716,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             self.word_display.value = "NENHUMA"
             self.recorded_alien_audio = None
             self.play_button.disabled = True
+            self.text_input.value = ""
         except Exception as ex:
             self.log_to_console(f"[ERRO] Falha ao salvar palavra: {ex}\n")
         finally:
