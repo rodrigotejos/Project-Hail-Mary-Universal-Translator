@@ -152,6 +152,14 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         ]
         vu_row = ft.Row(self.vu_bars, alignment=ft.MainAxisAlignment.CENTER, spacing=4)
 
+        # Dynamic progress bar for recording countdown
+        self.progress_bar = ft.ProgressBar(
+            value=0.0,
+            color=THEME["accent_color"],
+            bgcolor="#1a1a1a",
+            visible=False
+        )
+
         self.play_button = ft.ElevatedButton(
             "OUVIR ÁUDIO CAPTADO",
             icon=ft.Icons.PLAY_ARROW,
@@ -221,9 +229,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             ft.Container(
                 content=ft.Column([
                     ft.Text("CALIBRAÇÃO ACÚSTICA (EQUALIZADOR)", size=11, color="#888", weight="bold"),
-                    vu_row
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                height=110,
+                    vu_row,
+                    self.progress_bar
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
+                height=130,
                 bgcolor="#0e0e0e",
                 border=border_all(1, "#333"),
                 border_radius=5,
@@ -649,7 +658,9 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
         self.is_recording = True
         self.record_alien_btn.bgcolor = "#888888"
-        self.record_alien_btn.text = "GRAVANDO SOM..."
+        self.record_alien_btn.text = "GRAVANDO SOM (4.0s)..."
+        self.progress_bar.value = 0.0
+        self.progress_bar.visible = True
         self.page.update()
 
         self.log_to_console(f"[APRENDIZADO] Gravando grunhido alienígena para '{word}' (4s). Fale ao microfone.\n")
@@ -657,12 +668,34 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
     def record_alien_sound(self):
         """Runs the audio recording process and activates VU animations."""
+        duration = 4.0
+        sample_rate = self.translator.audio_processor.sample_rate
+        channels = self.translator.audio_processor.channels
+        
         # Start VU Meter animation thread
         threading.Thread(target=self.animate_vu_meter, daemon=True).start()
         
         try:
-            # Record via AudioProcessor
-            audio = self.translator.audio_processor.record_audio(duration=4.0)
+            # Start recording in background (non-blocking)
+            audio_buffer = sd.rec(
+                int(duration * sample_rate),
+                samplerate=sample_rate,
+                channels=channels,
+                dtype='float32'
+            )
+            
+            # Countdown progress bar update
+            steps = 40
+            sleep_interval = duration / steps
+            for i in range(steps):
+                time.sleep(sleep_interval)
+                remaining = duration - ((i + 1) * sleep_interval)
+                self.record_alien_btn.text = f"GRAVANDO ({max(0.0, remaining):.1f}s)..."
+                self.progress_bar.value = (i + 1) / steps
+                self.page.update()
+                
+            sd.wait() # Ensure audio buffer is fully populated
+            audio = audio_buffer.flatten()
             
             # Normalize the captured audio array immediately to ensure loud and clear playbacks
             max_val = np.max(np.abs(audio))
@@ -679,6 +712,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             self.log_to_console(f"[ERRO] Falha ao capturar som alienígena: {ex}\n")
         finally:
             self.is_recording = False
+            self.progress_bar.visible = False
             self.record_alien_btn.bgcolor = "#ff2a2a"
             self.record_alien_btn.text = "GRAVAR SOM ALIENÍGENA"
             self.page.update()
