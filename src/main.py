@@ -156,8 +156,14 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.progress_bar = ft.ProgressBar(
             value=0.0,
             color=THEME["accent_color"],
-            bgcolor="#1a1a1a",
-            visible=False
+            bgcolor="#1a1a1a"
+        )
+
+        self.countdown_text = ft.Text(
+            "STATUS: INATIVO",
+            size=10,
+            color="#888888",
+            weight="bold"
         )
 
         self.play_button = ft.ElevatedButton(
@@ -228,7 +234,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             # Audio Waveform visualizer container
             ft.Container(
                 content=ft.Column([
-                    ft.Text("CALIBRAÇÃO ACÚSTICA (EQUALIZADOR)", size=11, color="#888", weight="bold"),
+                    ft.Row([
+                        ft.Text("GRAVAÇÃO E CALIBRAÇÃO ACÚSTICA", size=10, color="#888", weight="bold"),
+                        self.countdown_text
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     vu_row,
                     self.progress_bar
                 ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
@@ -660,7 +669,8 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.record_alien_btn.bgcolor = "#888888"
         self.record_alien_btn.text = "GRAVANDO SOM (4.0s)..."
         self.progress_bar.value = 0.0
-        self.progress_bar.visible = True
+        self.countdown_text.value = "GRAVANDO: 4.0s"
+        self.countdown_text.color = "#ff9000"
         self.page.update()
 
         self.log_to_console(f"[APRENDIZADO] Gravando grunhido alienígena para '{word}' (4s). Fale ao microfone.\n")
@@ -672,9 +682,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         sample_rate = self.translator.audio_processor.sample_rate
         channels = self.translator.audio_processor.channels
         
-        # Start VU Meter animation thread
-        threading.Thread(target=self.animate_vu_meter, daemon=True).start()
-        
         try:
             # Start recording in background (non-blocking)
             audio_buffer = sd.rec(
@@ -684,15 +691,31 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 dtype='float32'
             )
             
-            # Countdown progress bar update
+            # Unified countdown and VU meter loop (thread-safe, single updates)
             steps = 40
             sleep_interval = duration / steps
+            import random
             for i in range(steps):
-                time.sleep(sleep_interval)
                 remaining = duration - ((i + 1) * sleep_interval)
                 self.record_alien_btn.text = f"GRAVANDO ({max(0.0, remaining):.1f}s)..."
+                self.countdown_text.value = f"GRAVANDO: {max(0.0, remaining):.1f}s"
+                self.countdown_text.color = "#ff9000"  # Orange
+                
+                # Update progress bar
                 self.progress_bar.value = (i + 1) / steps
+                
+                # Update VU equalizer height values
+                for bar in self.vu_bars:
+                    bar.height = random.randint(10, 90)
+                    if bar.height > 70:
+                        bar.bgcolor = "#ff9000"
+                    elif bar.height > 40:
+                        bar.bgcolor = "#00f0ff"
+                    else:
+                        bar.bgcolor = "#0055ff"
+                        
                 self.page.update()
+                time.sleep(sleep_interval)
                 
             sd.wait() # Ensure audio buffer is fully populated
             audio = audio_buffer.flatten()
@@ -712,32 +735,16 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             self.log_to_console(f"[ERRO] Falha ao capturar som alienígena: {ex}\n")
         finally:
             self.is_recording = False
-            self.progress_bar.visible = False
+            self.progress_bar.value = 0.0
+            self.countdown_text.value = "STATUS: INATIVO"
+            self.countdown_text.color = "#888888"
             self.record_alien_btn.bgcolor = "#ff2a2a"
             self.record_alien_btn.text = "GRAVAR SOM ALIENÍGENA"
-            self.page.update()
-
-    def animate_vu_meter(self):
-        """Simulates real-time microphone intensity inside the visual EQ equalizer bars."""
-        import random
-        while self.is_recording:
+            # Reset visual EQ bars to bottom state
             for bar in self.vu_bars:
-                bar.height = random.randint(10, 90)
-                # Color gradient for the bars
-                if bar.height > 70:
-                    bar.bgcolor = "#ff9000"  # Orange
-                elif bar.height > 40:
-                    bar.bgcolor = "#00f0ff"  # Cyan
-                else:
-                    bar.bgcolor = "#0055ff"  # Blue
+                bar.height = 10
+                bar.bgcolor = "#1a1a1a"
             self.page.update()
-            time.sleep(0.08)
-            
-        # Reset bars after recording completes
-        for bar in self.vu_bars:
-            bar.height = 10
-            bar.bgcolor = "#1a1a1a"
-        self.page.update()
 
     def play_last_audio(self, _e):
         """Play the recorded audio array directly using sounddevice."""
@@ -749,7 +756,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
         def play_task():
             self.is_playing_audio = True
-            threading.Thread(target=self.animate_playback_waveform, daemon=True).start()
+            
+            # Start visual animation in background matching the audio segment duration
+            playback_duration = len(self.recorded_alien_audio) / self.translator.audio_processor.sample_rate
+            threading.Thread(target=self.animate_playback, args=(playback_duration,), daemon=True).start()
             
             try:
                 sd.play(self.recorded_alien_audio, self.translator.audio_processor.sample_rate)
@@ -761,21 +771,34 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 self.play_button.disabled = False
                 self.page.update()
 
-        threading.Thread(play_task, daemon=True).start()
+        threading.Thread(target=play_task, daemon=True).start()
 
-    def animate_playback_waveform(self):
-        """Simulates signal wave pulse animations during audio playback."""
+    def animate_playback(self, duration: float):
+        """Animates the visual EQ bars during audio playback in a single thread-safe loop."""
         import random
-        while self.is_playing_audio:
+        steps = int(duration / 0.1)
+        if steps == 0:
+            steps = 10
+        sleep_interval = duration / steps
+        
+        self.countdown_text.value = "REPRODUZINDO"
+        self.countdown_text.color = "#00ff00"  # Green
+        
+        for _ in range(steps):
+            if not self.is_playing_audio:
+                break
             for bar in self.vu_bars:
                 bar.height = random.randint(10, 60)
                 bar.bgcolor = THEME["accent_color"]
             self.page.update()
-            time.sleep(0.08)
+            time.sleep(sleep_interval)
             
+        # Reset bars
         for bar in self.vu_bars:
             bar.height = 10
             bar.bgcolor = "#1a1a1a"
+        self.countdown_text.value = "STATUS: INATIVO"
+        self.countdown_text.color = "#888888"
         self.page.update()
 
     def save_word(self, _e):
@@ -961,12 +984,16 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
     def play_sequenced_audio(self, paths: list):
         """Sequentially play sound files using sounddevice (avoiding file locking issues)."""
         self.is_playing_audio = True
-        threading.Thread(target=self.animate_playback_waveform, daemon=True).start()
-
+        
         import librosa
         for path in paths:
             try:
                 audio, sr = librosa.load(path, sr=22050)
+                playback_duration = len(audio) / sr
+                
+                # Start visual animation in background matching the audio segment duration
+                threading.Thread(target=self.animate_playback, args=(playback_duration,), daemon=True).start()
+                
                 # Normalize audio segment so they sound uniform and audible
                 max_val = np.max(np.abs(audio))
                 if max_val > 0:
