@@ -156,7 +156,8 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.progress_bar = ft.ProgressBar(
             value=0.0,
             color=THEME["accent_color"],
-            bgcolor="#1a1a1a"
+            bgcolor="#1a1a1a",
+            width=280
         )
 
         self.countdown_text = ft.Text(
@@ -762,6 +763,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             threading.Thread(target=self.animate_playback, args=(playback_duration,), daemon=True).start()
             
             try:
+                device_info = sd.query_devices(sd.default.device[1])
+                device_name = device_info['name'] if device_info else 'Desconhecido'
+                self.log_to_console(f"[SISTEMA] Reproduzindo áudio na saída: {device_name}\n")
+                
                 sd.play(self.recorded_alien_audio, self.translator.audio_processor.sample_rate)
                 sd.wait()
             except Exception as ex:
@@ -1013,4 +1018,7 @@ def main(page: ft.Page):
     app.main(page)
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    if hasattr(ft, 'run'):
+        ft.run(main)
+    else:
+        ft.app(target=main)
