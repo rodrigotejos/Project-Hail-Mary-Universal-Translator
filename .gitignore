@@ -57,3 +57,8 @@ Thumbs.db
 # Models (Large weights)
 models/*.pth
 models/**/*.pth
+
+# AI-DLC
+aidlc-workflows/
+aidlc-workflows.zip
+.agents/
