@@ -12,3 +12,6 @@ torchaudio
 transformers
 torchvision
 modal
+sqlalchemy
+hypothesis
+pytest-asyncio

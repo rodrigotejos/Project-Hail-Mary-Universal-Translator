@@ -1,11 +1,11 @@
 # Unit of Work Plan
 
 ## Mandatory Unit Artifacts
-- [ ] Generate `aidlc-docs/inception/application-design/unit-of-work.md` with unit definitions and responsibilities
-- [ ] Generate `aidlc-docs/inception/application-design/unit-of-work-dependency.md` with dependency matrix
-- [ ] Generate `aidlc-docs/inception/application-design/unit-of-work-story-map.md` mapping stories to units
-- [ ] Validate unit boundaries and dependencies
-- [ ] Ensure all stories (or technical requirements) are assigned to units
+- [x] Generate `aidlc-docs/inception/application-design/unit-of-work.md` with unit definitions and responsibilities
+- [x] Generate `aidlc-docs/inception/application-design/unit-of-work-dependency.md` with dependency matrix
+- [x] Generate `aidlc-docs/inception/application-design/unit-of-work-story-map.md` mapping stories to units
+- [x] Validate unit boundaries and dependencies
+- [x] Ensure all stories (or technical requirements) are assigned to units
 
 ## Units Generation Clarification Questions
 
@@ -26,4 +26,4 @@ B) **UI First**: Build the Flet screens and mock the data layer temporarily, the
 C) Not applicable (I chose a Single Monolithic Unit).
 X) Other (please describe after [Answer]: tag below)
 
-[Answer]: b
+[Answer]: a

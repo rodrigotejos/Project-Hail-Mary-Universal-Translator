@@ -21,9 +21,11 @@
 - [x] Requirements Analysis
 - [x] Workflow Planning
 - [x] Application Design
-- [ ] Units Generation - EXECUTE
-- [ ] Functional Design - EXECUTE
-- [ ] NFR Design - EXECUTE
+- [x] Units Generation
+
+### 🟢 CONSTRUCTION PHASE (Unit 2)
+- [x] Functional Design
+- [x] NFR Design
 - [ ] Code Generation - EXECUTE
 - [ ] Build and Test - EXECUTE
 
@@ -36,6 +38,6 @@
 
 ## Current Status
 - **Lifecycle Phase**: INCEPTION
-- **Current Stage**: Application Design Complete
-- **Next Stage**: Units Generation
+- **Current Stage**: Units Generation Complete
+- **Next Stage**: Functional Design (CONSTRUCTION PHASE)
 - **Status**: Ready to proceed
