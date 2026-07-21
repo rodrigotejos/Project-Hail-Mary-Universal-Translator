@@ -84,6 +84,39 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             self.log_to_console(f"[ERRO] Falha crítica ao inicializar: {ex}\n")
         self.page.update()
 
+    def on_sync_cloud_click(self, _e=None):
+        self.sync_cloud_btn.disabled = True
+        self.cloud_status_text.value = "[Cloud] STATUS: SINCRONIZANDO..."
+        self.cloud_status_text.color = "#ffaa00"
+        self.page.update()
+
+        def do_sync():
+            try:
+                from src.database.registry import TranslatorDB
+                from src.services.sync_service import MockSupabaseSync
+                db = TranslatorDB()
+                sync_svc = MockSupabaseSync(db)
+                res = sync_svc.sync_all()
+                if res.success:
+                    self.cloud_status_text.value = f"[Cloud] ONLINE (Pushed: {res.records_pushed} | Pulled: {res.records_pulled})"
+                    self.cloud_status_text.color = "#00ff00"
+                    snack = ft.SnackBar(content=ft.Text(f"Sincronização concluída com sucesso! (Pushed: {res.records_pushed}, Pulled: {res.records_pulled})"), bgcolor="green")
+                else:
+                    self.cloud_status_text.value = "[Cloud] FALHA NA SINCRONIZAÇÃO"
+                    self.cloud_status_text.color = "#ff0000"
+                    snack = ft.SnackBar(content=ft.Text(f"Erro na sincronização: {res.error_message}"), bgcolor="red")
+            except Exception as ex:
+                self.cloud_status_text.value = "[Cloud] ERRO"
+                self.cloud_status_text.color = "#ff0000"
+                snack = ft.SnackBar(content=ft.Text(f"Falha ao sincronizar: {ex}"), bgcolor="red")
+            finally:
+                self.sync_cloud_btn.disabled = False
+                self.page.overlay.append(snack)
+                snack.open = True
+                self.page.update()
+
+        threading.Thread(target=do_sync, daemon=True).start()
+
     def get_available_languages(self):
         langs = ["clingo", "ingles"]
         if os.path.exists("linguagens"):
@@ -96,9 +129,13 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
     def create_ui_elements(self):
         # --- HEADER ---
         self.status_text = ft.Text("SISTEMA INICIANDO (Carregando IA)...", color=THEME["status_color"], size=13, weight="bold")
+        self.cloud_status_text = ft.Text("[Cloud] STATUS: OFFLINE", color=THEME["status_color"], size=13, weight="bold", key="txt-cloud-status")
+        self.sync_cloud_btn = ft.ElevatedButton("SINCRONIZAR NUVEM", icon=ft.Icons.CLOUD_SYNC, bgcolor=THEME["accent_color"], color="black", key="btn-sync-cloud")
+        self.sync_cloud_btn.on_click = self.on_sync_cloud_click
+
         header = ft.Row([
             ft.Text("PROJETO: TRADUÇÃO UNIVERSAL ....", size=20, color=THEME["accent_color"], weight="bold"),
-            self.status_text
+            ft.Row([self.cloud_status_text, self.sync_cloud_btn, self.status_text], spacing=10)
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
 
         # --- LEFT PANEL: LEARNING MODULE ---
@@ -128,7 +165,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.play_button.on_click = self.play_last_audio
         self.word_display = ft.Text("NENHUMA", size=36, weight="bold", color=THEME["status_color"], text_align="center")
 
-        self.text_input = ft.TextField(label="Palavra em Português", hint_text="Digite para mapear...", bgcolor="#111", border_color=THEME["border_color"], color="white", text_size=14)
+        self.text_input = ft.TextField(label="Palavra em Português", hint_text="Digite para mapear...", bgcolor="#111", border_color=THEME["border_color"], color="white", text_size=14, key="input-word-key")
         self.text_input.on_submit = self.on_text_submit
         self.text_input.on_change = self.on_text_change
         self.mic_button = ft.IconButton(icon=ft.Icons.MIC, icon_color=THEME["accent_color"], icon_size=24, disabled=True)
@@ -168,7 +205,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
         # --- CENTER PANEL: CONVERSATION MODULE ---
         self.chat_container = ft.Container(height=460, bgcolor="#040406", border=border_all(1, "#222"), border_radius=5, padding=10, content=ft.Column([], scroll=ft.ScrollMode.AUTO))
-        self.chat_input = ft.TextField(hint_text="Escreva em Português para traduzir...", bgcolor="#111", border_color=THEME["border_color"], color="white", text_size=13, expand=True)
+        self.chat_input = ft.TextField(hint_text="Escreva em Português para traduzir...", bgcolor="#111", border_color=THEME["border_color"], color="white", text_size=13, expand=True, key="input-conversation-msg")
         self.chat_input.on_submit = self.on_chat_submit
         self.chat_mic_button = ft.IconButton(icon=ft.Icons.MIC, icon_color=THEME["accent_color"], icon_size=20, disabled=True)
         self.chat_mic_button.on_click = self.on_chat_mic_click

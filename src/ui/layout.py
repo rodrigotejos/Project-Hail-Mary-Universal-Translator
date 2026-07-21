@@ -27,15 +27,20 @@ def create_panel(title, content):
     )
 
 def create_main_layout():
-    """Creates the main layout structure for the application."""
+    """Creates the main layout structure for the application and returns interactive controls."""
+    txt_cloud_status = ft.Text("[Cloud] STATUS: OFFLINE", color=THEME["status_color"], key="txt-cloud-status")
+    btn_sync_cloud = ft.ElevatedButton("SINCRONIZAR NUVEM", icon=ft.Icons.SYNC, key="btn-sync-cloud")
+    input_word_key = ft.TextField(hint_text="digite a palavra...", key="input-word-key")
+    input_conversation_msg = ft.TextField(hint_text="escrever mensagem...", key="input-conversation-msg")
+
     # Learning Module
     left_content = ft.Column([
         ft.Text("MÓDULO DE APRENDIZADO", color=THEME["accent_color"]),
         ft.Container(height=100, bgcolor="#1a1a1a"), # Mock waveform
-        ft.ElevatedButton("OUVIR ÁUDIO CAPTADO", bgcolor=THEME["accent_color"], color="black"),
+        ft.ElevatedButton("OUVIR ÁUDIO CAPTADO", bgcolor=THEME["accent_color"], color="black", key="btn-listen-audio"),
         ft.Text("ENTRADA DE DADOS: PORTUGUÊS", color="white"),
         ft.Text("MÚSICA", size=40, weight="bold", color="#ff9000"),
-        ft.TextField(hint_text="digite a palavra..."),
+        input_word_key,
         ft.Row([
             ft.Icon(ft.Icons.MIC, color=THEME["accent_color"]),
             ft.Text("(Falar)"),
@@ -53,7 +58,7 @@ def create_main_layout():
             bottom=ft.BorderSide(1, "#333"),
             left=ft.BorderSide(1, "#333")
         )),
-        ft.TextField(hint_text="escrever mensagem..."),
+        input_conversation_msg,
         ft.Row([
             ft.Icon(ft.Icons.MIC, color=THEME["accent_color"]),
             ft.Text("(Falar)"),
@@ -62,12 +67,17 @@ def create_main_layout():
         ])
     ])
 
-    return ft.Container(
+    header_row = ft.Row([
+        ft.Text("PROJETO: TRADUÇÃO UNIVERSAL ....", size=20, color=THEME["accent_color"]),
+        ft.Row([
+            txt_cloud_status,
+            btn_sync_cloud
+        ], spacing=15)
+    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+
+    layout_container = ft.Container(
         content=ft.Column([
-            ft.Row([
-                ft.Text("PROJETO: TRADUÇÃO UNIVERSAL ....", size=20, color=THEME["accent_color"]),
-                ft.Text("[Cloud] STATUS: OFFLINE SOMENTE", color=THEME["status_color"])
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            header_row,
             ft.Row([
                 ft.Container(create_panel("MÓDULO DE APRENDIZADO", left_content), expand=True),
                 ft.Container(create_panel("MÓDULO DE CONVERSAÇÃO", right_content), expand=True),
@@ -83,3 +93,12 @@ def create_main_layout():
         border_radius=10,
         bgcolor="#050505"
     )
+
+    controls = {
+        "txt_cloud_status": txt_cloud_status,
+        "btn_sync_cloud": btn_sync_cloud,
+        "input_word_key": input_word_key,
+        "input_conversation_msg": input_conversation_msg
+    }
+
+    return layout_container, controls

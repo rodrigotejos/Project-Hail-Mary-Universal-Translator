@@ -7,25 +7,18 @@ from unittest.mock import patch
 from src.database.registry import TranslatorDB, Dictionary, Language
 from src.services.sync_service import MockSupabaseSync, RetryManager, SyncResult
 
-# Fixture to provide an in-memory test database
-@pytest.fixture
-def test_db():
-    # Use in-memory SQLite for fast testing
-    db = TranslatorDB(db_path=":memory:")
-    yield db
-    db.close()
-
 # --- Step 3.1: Fuzz text boundaries for the UUID generator ---
 @given(
     english=st.text(min_size=1, max_size=500),
     alien_lang=st.text(min_size=1, max_size=100).filter(lambda x: x.isascii() and x.isalnum())
 )
 @settings(max_examples=50)
-def test_uuid_deterministic_generation(test_db, english, alien_lang):
+def test_uuid_deterministic_generation(english, alien_lang):
     """
     Test that the UUID generation does not crash on extreme text input
     and remains deterministic.
     """
+    test_db = TranslatorDB(db_path=":memory:")
     try:
         test_db.add_word(language_name=alien_lang, word=english, audio_path="/dummy/path")
         
@@ -41,13 +34,16 @@ def test_uuid_deterministic_generation(test_db, english, alien_lang):
             # Re-adding the same word shouldn't crash, should just update
             test_db.add_word(language_name=alien_lang, word=english, audio_path="/dummy/path2")
             
+            # Expire session cache to read updated state from DB
+            session.expire_all()
+            
             # Ensure UUID remained the same (deterministic)
             record2 = session.query(Dictionary).filter_by(language_id=lang.id, word_key=english.upper()).first()
             assert record.uuid == record2.uuid
             assert record2.audio_path == "/dummy/path2"
             
-    except Exception as e:
-        pytest.fail(f"PBT Fuzzing failed with text: {e}")
+    finally:
+        test_db.close()
 
 # --- Step 3.2: Fuzz network exceptions on the Mock JSON file to test the RetryManager ---
 @given(

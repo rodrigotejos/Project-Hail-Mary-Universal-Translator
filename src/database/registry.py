@@ -39,13 +39,15 @@ class TranslatorDB:
     """Class to manage SQLAlchemy database operations for the translator."""
     
     def __init__(self, db_path="src/database/registry.db"):
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
-        # sqlite:/// requires absolute path or relative, 
-        # but relative to the current working directory, it's sqlite:///src/database/registry.db
-        # Let's ensure it's absolute
-        abs_path = os.path.abspath(db_path)
-        db_url = f"sqlite:///{abs_path}"
+        if db_path.startswith(":memory:"):
+            db_url = "sqlite:///:memory:"
+        else:
+            dirname = os.path.dirname(db_path)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            abs_path = os.path.abspath(db_path)
+            db_url = f"sqlite:///{abs_path}"
         self.engine = create_engine(db_url, echo=False)
         self.Session = sessionmaker(bind=self.engine)
         
