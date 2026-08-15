@@ -1,7 +1,7 @@
 import os
 import json
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings, HealthCheck, strategies as st
 from unittest.mock import patch
 
 from src.database.registry import TranslatorDB, Dictionary, Language
@@ -10,9 +10,9 @@ from src.services.sync_service import MockSupabaseSync, RetryManager, SyncResult
 # --- Step 3.1: Fuzz text boundaries for the UUID generator ---
 @given(
     english=st.text(min_size=1, max_size=500),
-    alien_lang=st.text(min_size=1, max_size=100).filter(lambda x: x.isascii() and x.isalnum())
+    alien_lang=st.from_regex(r'^[a-zA-Z0-9_]{1,50}$', fullmatch=True)
 )
-@settings(max_examples=50)
+@settings(max_examples=50, suppress_health_check=[HealthCheck.filter_too_much])
 def test_uuid_deterministic_generation(english, alien_lang):
     """
     Test that the UUID generation does not crash on extreme text input

@@ -1,33 +1,36 @@
 """
 SQLAlchemy database registry for Universal Translator.
+Hardened with parameterized ORM queries, PRAGMAs (WAL & Foreign Keys), and deterministic hashing.
 """
 import os
 import hashlib
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import create_engine, inspect, Column, Integer, String, ForeignKey, UniqueConstraint, text
+from sqlalchemy import create_engine, inspect, event, Column, Integer, String, ForeignKey, UniqueConstraint, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 Base = declarative_base()
 
+
 class Language(Base):
     __tablename__ = 'languages'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String(128), unique=True, nullable=False, index=True)
     
-    words = relationship("Dictionary", back_populates="language")
+    words = relationship("Dictionary", back_populates="language", cascade="all, delete-orphan")
+
 
 class Dictionary(Base):
     __tablename__ = 'dictionary'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    uuid = Column(String, unique=True, nullable=True) # Will be backfilled
-    language_id = Column(Integer, ForeignKey('languages.id'), nullable=False)
-    word_key = Column(String, nullable=False)
-    audio_path = Column(String, nullable=False)
-    synced = Column(Integer, default=0)
-    updated_at = Column(String, default=lambda: datetime.now(timezone.utc).isoformat())
-    created_at = Column(String, default=lambda: datetime.now(timezone.utc).isoformat())
+    uuid = Column(String(64), unique=True, nullable=True, index=True)
+    language_id = Column(Integer, ForeignKey('languages.id', ondelete='CASCADE'), nullable=False)
+    word_key = Column(String(512), nullable=False, index=True)
+    audio_path = Column(String(1024), nullable=False)
+    synced = Column(Integer, default=0, index=True)
+    updated_at = Column(String(64), default=lambda: datetime.now(timezone.utc).isoformat())
+    created_at = Column(String(64), default=lambda: datetime.now(timezone.utc).isoformat())
 
     __table_args__ = (
         UniqueConstraint('language_id', 'word_key', name='uq_language_word'),
@@ -35,10 +38,11 @@ class Dictionary(Base):
     
     language = relationship("Language", back_populates="words")
 
+
 class TranslatorDB:
     """Class to manage SQLAlchemy database operations for the translator."""
     
-    def __init__(self, db_path="src/database/registry.db"):
+    def __init__(self, db_path: str = "src/database/registry.db"):
         self.db_path = db_path
         if db_path.startswith(":memory:"):
             db_url = "sqlite:///:memory:"
@@ -48,9 +52,18 @@ class TranslatorDB:
                 os.makedirs(dirname, exist_ok=True)
             abs_path = os.path.abspath(db_path)
             db_url = f"sqlite:///{abs_path}"
+
         self.engine = create_engine(db_url, echo=False)
+
+        # Enable SQLite Foreign Keys and WAL Mode on connect (SECURITY-01 / Resiliency)
+        @event.listens_for(self.engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, _connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.close()
+
         self.Session = sessionmaker(bind=self.engine)
-        
         self._ensure_schema_and_migrate()
 
     def _ensure_schema_and_migrate(self):
@@ -64,24 +77,20 @@ class TranslatorDB:
         columns = [col['name'] for col in inspector.get_columns('dictionary')]
         with self.engine.connect() as conn:
             if 'uuid' not in columns:
-                conn.execute(text("ALTER TABLE dictionary ADD COLUMN uuid VARCHAR UNIQUE"))
+                conn.execute(text("ALTER TABLE dictionary ADD COLUMN uuid VARCHAR(64)"))
             if 'synced' not in columns:
                 conn.execute(text("ALTER TABLE dictionary ADD COLUMN synced INTEGER DEFAULT 0"))
             if 'updated_at' not in columns:
-                conn.execute(text("ALTER TABLE dictionary ADD COLUMN updated_at VARCHAR"))
+                conn.execute(text("ALTER TABLE dictionary ADD COLUMN updated_at VARCHAR(64)"))
             conn.commit()
 
         # Run migration logic
         with self.Session() as session:
-            # Find records without UUID
             legacy_records = session.query(Dictionary).filter(Dictionary.uuid.is_(None)).all()
             for record in legacy_records:
                 lang = session.query(Language).filter(Language.id == record.language_id).first()
                 lang_name = lang.name if lang else "unknown"
                 
-                # Deterministic hash: SHA256 of english_word:alien_word
-                # In this app, word_key is the human text. We don't store the exact "alien text" structurally here,
-                # we just map it to the audio_path. So we hash word_key + lang_name
                 raw_str = f"{record.word_key}:{lang_name}".encode('utf-8')
                 new_uuid = hashlib.sha256(raw_str).hexdigest()
                 
@@ -95,7 +104,7 @@ class TranslatorDB:
 
     def get_or_create_language(self, session, name: str) -> int:
         """Get or create a language ID by name."""
-        name = name.lower()
+        name = str(name).lower()
         lang = session.query(Language).filter(Language.name == name).first()
         if not lang:
             lang = Language(name=name)
@@ -104,30 +113,31 @@ class TranslatorDB:
         return lang.id
 
     def add_word(self, language_name: str, word: str, audio_path: str):
-        """Adiciona ou atualiza uma palavra no dicionário"""
+        """Adiciona ou atualiza uma palavra no dicionário de forma segura"""
         with self.Session() as session:
-            lang_id = self.get_or_create_language(session, language_name)
-            word = word.upper()
+            clean_lang = str(language_name).lower()
+            clean_word = str(word).upper()
+            lang_id = self.get_or_create_language(session, clean_lang)
             
             record = session.query(Dictionary).filter(
                 Dictionary.language_id == lang_id,
-                Dictionary.word_key == word
+                Dictionary.word_key == clean_word
             ).first()
             
-            raw_str = f"{word}:{language_name.lower()}".encode('utf-8')
+            raw_str = f"{clean_word}:{clean_lang}".encode('utf-8')
             new_uuid = hashlib.sha256(raw_str).hexdigest()
             now_iso = datetime.now(timezone.utc).isoformat()
 
             if record:
-                record.audio_path = audio_path
+                record.audio_path = str(audio_path)
                 record.synced = 0
                 record.updated_at = now_iso
             else:
                 record = Dictionary(
                     uuid=new_uuid,
                     language_id=lang_id,
-                    word_key=word,
-                    audio_path=audio_path,
+                    word_key=clean_word,
+                    audio_path=str(audio_path),
                     synced=0,
                     updated_at=now_iso,
                     created_at=now_iso
@@ -135,19 +145,19 @@ class TranslatorDB:
                 session.add(record)
             
             session.commit()
-            print(f"[DB] Palavra '{word}' salva para o idioma '{language_name}'")
+            print(f"[DB] Palavra '{clean_word}' salva para o idioma '{clean_lang}'")
 
     def get_word_audio(self, language_name: str, word: str) -> Optional[str]:
         """Busca o caminho do áudio de uma palavra"""
         with self.Session() as session:
-            name = language_name.lower()
+            name = str(language_name).lower()
             lang = session.query(Language).filter(Language.name == name).first()
             if not lang:
                 return None
             
             record = session.query(Dictionary).filter(
                 Dictionary.language_id == lang.id,
-                Dictionary.word_key == word.upper()
+                Dictionary.word_key == str(word).upper()
             ).first()
             
             return record.audio_path if record else None
@@ -155,7 +165,7 @@ class TranslatorDB:
     def get_all_vocabulary(self, language_name: str) -> List[Tuple[str, str]]:
         """Retorna todas as palavras aprendidas de um idioma"""
         with self.Session() as session:
-            name = language_name.lower()
+            name = str(language_name).lower()
             lang = session.query(Language).filter(Language.name == name).first()
             if not lang:
                 return []

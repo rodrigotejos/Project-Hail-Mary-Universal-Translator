@@ -1,20 +1,45 @@
 """
 Main application module for the Universal Translator UI.
+Hardened with input sanitization, safe subprocess execution, config validation, and OWASP Top 10 defenses.
 """
 # pylint: disable=unexpected-keyword-arg, too-many-function-args, no-member
 import os
 import re
 import sys
 import time
+import tempfile
 import threading
 import subprocess
 import numpy as np
 import flet as ft
 import sounddevice as sd
 
-from ui.theme import THEME, get_theme
-from engine.translator import UniversalTranslator
-from config import TRAINING_MODE, ACOUSTIC_MODEL_BACKBONE
+try:
+    from src.ui.theme import THEME, get_theme
+    from src.engine.translator import UniversalTranslator
+    from src.config import TRAINING_MODE, ACOUSTIC_MODEL_BACKBONE
+    from src.security_utils import (
+        sanitize_identifier, sanitize_word_key, is_safe_path,
+        MAX_MESSAGE_LENGTH, SecurityError
+    )
+except ImportError:
+    from ui.theme import THEME, get_theme
+    from engine.translator import UniversalTranslator
+    from config import TRAINING_MODE, ACOUSTIC_MODEL_BACKBONE
+    from security_utils import (
+        sanitize_identifier, sanitize_word_key, is_safe_path,
+        MAX_MESSAGE_LENGTH, SecurityError
+    )
+
+ALLOWED_TRAINING_MODES = {"local", "cloud"}
+ALLOWED_BACKBONES = {"ast", "mobilenet"}
+ALLOWED_SCRIPTS = {
+    "train_siamese.py",
+    "migrate_to_vector_db.py",
+    "list_vocabulary.py",
+    "learn_vocabulary.py"
+}
+
 
 def border_all(width: float, color: str):
     """Helper to create a 4-sided border in backward-compatible Flet syntax."""
@@ -24,6 +49,7 @@ def border_all(width: float, color: str):
         bottom=ft.BorderSide(width, color),
         left=ft.BorderSide(width, color)
     )
+
 
 class TranslatorApp:  # pylint: disable=too-many-instance-attributes
     """Main application class for the Universal Translator."""
@@ -64,7 +90,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
     def load_translator_engine(self):
         self.log_to_console("[SISTEMA] Inicializando motores neurais...\n")
-        self.log_to_console("[SISTEMA] Carregando modelo Whisper 'small' (isso pode levar alguns segundos)...\n")
+        self.log_to_console("[SISTEMA] Carregando modelo Whisper 'small'...\n")
         try:
             self.translator = UniversalTranslator(model_size="small")
             self.status_text.value = f"[Nuvem] STATUS: PRONTO ({TRAINING_MODE.upper()} / {ACOUSTIC_MODEL_BACKBONE.upper()})"
@@ -119,11 +145,17 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
     def get_available_languages(self):
         langs = ["clingo", "ingles"]
-        if os.path.exists("linguagens"):
-            for item in os.listdir("linguagens"):
-                if os.path.isdir(os.path.join("linguagens", item)):
-                    if item not in langs:
-                        langs.append(item)
+        base_dir = "linguagens"
+        if os.path.exists(base_dir):
+            for item in os.listdir(base_dir):
+                item_path = os.path.join(base_dir, item)
+                if os.path.isdir(item_path) and is_safe_path(base_dir, item_path):
+                    try:
+                        clean_item = sanitize_identifier(item)
+                        if clean_item not in langs:
+                            langs.append(clean_item)
+                    except ValueError:
+                        continue
         return langs
 
     def create_ui_elements(self):
@@ -154,7 +186,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.vu_bars = [ft.Container(width=6, height=10, bgcolor="#1a1a1a", border_radius=2) for _ in range(16)]
         vu_row = ft.Row(self.vu_bars, alignment=ft.MainAxisAlignment.CENTER, spacing=4)
 
-        # Bulletproof Custom Progress Bar
         self.progress_bar_inner = ft.Container(width=0, height=8, bgcolor=THEME["accent_color"], border_radius=4)
         self.progress_bar_container = ft.Container(
             width=280, height=8, bgcolor="#1a1a1a", border_radius=4, content=self.progress_bar_inner
@@ -171,7 +202,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.mic_button = ft.IconButton(icon=ft.Icons.MIC, icon_color=THEME["accent_color"], icon_size=24, disabled=True)
         self.mic_button.on_click = self.on_mic_click
 
-        # Custom Container Button to guarantee style updates bypass Flet ElevatedButton bugs
         self.record_alien_btn_text = ft.Text("GRAVAR SOM ALIENÍGENA", color="white", weight="bold", size=13)
         self.record_alien_btn = ft.Container(
             content=ft.Row([ft.Icon(ft.Icons.FIBER_MANUAL_RECORD, color="white", size=16), self.record_alien_btn_text], alignment=ft.MainAxisAlignment.CENTER),
@@ -279,50 +309,107 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.page.update()
 
     def save_config(self, _e=None):
-        backbone = self.backbone_dropdown.value
-        mode = self.train_mode_dropdown.value
+        """Saves configuration safely with strict allowlists and atomic file write."""
+        backbone = str(self.backbone_dropdown.value).strip().lower()
+        mode = str(self.train_mode_dropdown.value).strip().lower()
+
+        if backbone not in ALLOWED_BACKBONES:
+            self.log_to_console(f"[ERRO] Backbone inválido: {backbone}\n")
+            return
+        if mode not in ALLOWED_TRAINING_MODES:
+            self.log_to_console(f"[ERRO] Modo de treino inválido: {mode}\n")
+            return
+
         config_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "config.py"))
         if os.path.exists(config_path):
             try:
-                with open(config_path, "r", encoding="utf-8") as f: content = f.read()
+                with open(config_path, "r", encoding="utf-8") as f:
+                    content = f.read()
                 content = re.sub(r'TRAINING_MODE\s*=\s*["\'][^"\']*["\']', f'TRAINING_MODE = "{mode}"', content)
                 content = re.sub(r'ACOUSTIC_MODEL_BACKBONE\s*=\s*["\'][^"\']*["\']', f'ACOUSTIC_MODEL_BACKBONE = "{backbone}"', content)
-                with open(config_path, "w", encoding="utf-8") as f: f.write(content)
+                
+                # Atomic file write
+                dir_name = os.path.dirname(config_path)
+                with tempfile.NamedTemporaryFile('w', dir=dir_name, delete=False, encoding='utf-8') as tmp_f:
+                    tmp_f.write(content)
+                    tmp_path = tmp_f.name
+                os.replace(tmp_path, config_path)
+
                 self.log_to_console(f"[CONFIG] Atualização salva: BACKBONE={backbone.upper()} | MODO={mode.upper()}\n")
                 self.status_text.value = f"[Nuvem] STATUS: PRONTO ({mode.upper()} / {backbone.upper()})"
                 self.page.update()
             except Exception as ex:
                 self.log_to_console(f"[ERRO] Falha ao escrever config.py: {ex}\n")
 
-    def run_script_in_console(self, script_name: str, args: list = []):
+    def run_script_in_console(self, script_name: str, args: list = None):
+        """Runs permitted scripts with strict allowlist and argument sanitization."""
+        if args is None:
+            args = []
+
+        if script_name not in ALLOWED_SCRIPTS:
+            self.log_to_console(f"[ERRO DE SEGURANÇA] Script não permitido: {script_name}\n")
+            return
+
+        # Sanitize arguments: only allow alphanumeric, hyphens, and integer values
+        sanitized_args = []
+        for arg in args:
+            arg_str = str(arg)
+            if re.match(r'^[a-zA-Z0-9_\-\.]+$', arg_str):
+                sanitized_args.append(arg_str)
+            else:
+                self.log_to_console(f"[ERRO DE SEGURANÇA] Argumento inválido descartado: {arg_str}\n")
+                return
+
         self.train_button.disabled = True
         self.sync_button.disabled = True
         self.page.update()
+
         def target():
             try:
-                script_path = os.path.join("scripts", script_name)
-                self.log_to_console(f"\n[SISTEMA] INICIANDO: python {script_name} {' '.join(args)}\n")
+                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+                scripts_dir = os.path.join(project_root, "scripts")
+                script_path = os.path.join(scripts_dir, script_name)
+
+                if not is_safe_path(scripts_dir, script_path) or not os.path.exists(script_path):
+                    self.log_to_console(f"[ERRO DE SEGURANÇA] Caminho de script inválido: {script_path}\n")
+                    return
+
+                self.log_to_console(f"\n[SISTEMA] INICIANDO: python {script_name} {' '.join(sanitized_args)}\n")
                 env = os.environ.copy()
                 env["PYTHONUNBUFFERED"] = "1"
-                process = subprocess.Popen([sys.executable, script_path] + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)
-                for line in iter(process.stdout.readline, ''): self.log_to_console(line)
+                process = subprocess.Popen(
+                    [sys.executable, script_path] + sanitized_args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    env=env
+                )
+                for line in iter(process.stdout.readline, ''):
+                    self.log_to_console(line)
                 process.stdout.close()
                 rc = process.wait()
-                if rc == 0: self.log_to_console(f"[SISTEMA] OPERAÇÃO CONCLUÍDA COM SUCESSO!\n")
-                else: self.log_to_console(f"[SISTEMA] ERRO: OPERAÇÃO FALHOU COM CÓDIGO {rc}\n")
+                if rc == 0:
+                    self.log_to_console("[SISTEMA] OPERAÇÃO CONCLUÍDA COM SUCESSO!\n")
+                else:
+                    self.log_to_console(f"[SISTEMA] ERRO: OPERAÇÃO FALHOU COM CÓDIGO {rc}\n")
             except Exception as ex:
                 self.log_to_console(f"[SISTEMA] FALHA DE INICIALIZAÇÃO DE SUBPROCESSO: {ex}\n")
             finally:
                 self.train_button.disabled = False
                 self.sync_button.disabled = False
                 self.page.update()
+
         threading.Thread(target=target, daemon=True).start()
 
     def add_message_to_chat(self, sender: str, message: str = "", is_user: bool = True, spans: list = None):
         bubble_color = "#121420" if is_user else "#0f0e0d"
         border_color = THEME["accent_color"] if is_user else THEME["status_color"]
-        if spans: text_control = ft.Text(spans=spans, size=13)
-        else: text_control = ft.Text(message, size=13, color="white" if is_user else THEME["status_color"])
+        if spans:
+            text_control = ft.Text(spans=spans, size=13)
+        else:
+            safe_msg = message[:MAX_MESSAGE_LENGTH]
+            text_control = ft.Text(safe_msg, size=13, color="white" if is_user else THEME["status_color"])
         message_bubble = ft.Container(
             content=ft.Column([ft.Text(sender, size=10, color="#888888", weight="bold"), text_control], spacing=2),
             bgcolor=bubble_color, border=border_all(1, border_color), padding=9, border_radius=8, margin=ft.margin.Margin(bottom=5), width=280
@@ -331,30 +418,49 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.page.update()
 
     def on_lang_change(self, _e):
-        self.target_language = self.lang_dropdown.value
-        self.log_to_console(f"[SISTEMA] Idioma alvo alterado para: '{self.target_language.upper()}'\n")
+        try:
+            self.target_language = sanitize_identifier(self.lang_dropdown.value)
+            self.log_to_console(f"[SISTEMA] Idioma alvo alterado para: '{self.target_language.upper()}'\n")
+        except ValueError as ex:
+            self.log_to_console(f"[ERRO] Idioma inválido: {ex}\n")
 
     def add_new_language(self, _e):
-        new_lang = self.new_lang_input.value.strip().lower()
-        if new_lang:
-            os.makedirs(f"linguagens/{new_lang}", exist_ok=True)
-            self.target_language = new_lang
-            self.new_lang_input.value = ""
-            self.lang_dropdown.options = [ft.dropdown.Option(l) for l in self.get_available_languages()]
-            self.lang_dropdown.value = new_lang
-            self.log_to_console(f"[SISTEMA] Novo idioma criado e selecionado: '{new_lang.upper()}'\n")
-            self.page.update()
+        raw_lang = self.new_lang_input.value.strip()
+        if raw_lang:
+            try:
+                new_lang = sanitize_identifier(raw_lang)
+                lang_path = os.path.join("linguagens", new_lang)
+                if not is_safe_path("linguagens", lang_path):
+                    self.log_to_console("[ERRO DE SEGURANÇA] Tentativa de Path Traversal bloqueada.\n")
+                    return
+                os.makedirs(lang_path, exist_ok=True)
+                self.target_language = new_lang
+                self.new_lang_input.value = ""
+                self.lang_dropdown.options = [ft.dropdown.Option(l) for l in self.get_available_languages()]
+                self.lang_dropdown.value = new_lang
+                self.log_to_console(f"[SISTEMA] Novo idioma criado e selecionado: '{new_lang.upper()}'\n")
+                self.page.update()
+            except ValueError as ex:
+                self.log_to_console(f"[AVISO] Nome de idioma inválido: {ex}\n")
 
     def on_text_change(self, _e):
-        word = self.text_input.value.strip().upper()
-        self.word_display.value = word if word else "NENHUMA"
+        raw = self.text_input.value.strip()
+        try:
+            word = sanitize_word_key(raw) if raw else "NENHUMA"
+        except ValueError:
+            word = "NENHUMA"
+        self.word_display.value = word
         self.page.update()
 
     def on_text_submit(self, _e):
-        word = self.text_input.value.strip().upper()
-        if word:
-            self.word_display.value = word
-            self.page.update()
+        raw = self.text_input.value.strip()
+        if raw:
+            try:
+                word = sanitize_word_key(raw)
+                self.word_display.value = word
+                self.page.update()
+            except ValueError as ex:
+                self.log_to_console(f"[AVISO] Palavra inválida: {ex}\n")
 
     def on_mic_click(self, _e):
         if self.is_listening: return
@@ -367,7 +473,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
     def listen_for_word(self):
         try:
             word = self.translator.listen_and_transcribe(duration=3.0)
-            word = word.strip().upper().replace(".", "").replace(",", "").replace("!", "")
+            word = sanitize_word_key(word) if word.strip() else ""
             if word:
                 self.word_display.value = word
                 self.text_input.value = ""
@@ -385,7 +491,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
     def record_alien_sound_start(self, _e):
         if self.word_display.value in ("NENHUMA", "NÃO DETECTADO", "ERRO") and self.text_input.value.strip():
-            self.word_display.value = self.text_input.value.strip().upper()
+            try:
+                self.word_display.value = sanitize_word_key(self.text_input.value.strip())
+            except ValueError:
+                pass
         word = self.word_display.value.strip()
         if not word or word in ("NENHUMA", "NÃO DETECTADO", "ERRO"):
             self.log_to_console("[AVISO] Defina um conceito em foco antes de gravar o som correspondente!\n")
@@ -408,7 +517,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         sample_rate = self.translator.audio_processor.sample_rate
         channels = self.translator.audio_processor.channels
         try:
-            # Create a console text control for the text progress bar!
             console_progress = ft.Text("", font_family="monospace", size=10, color="#ff9000")
             self.console_column.controls.append(console_progress)
             self.page.update()
@@ -422,12 +530,10 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 pct = (i + 1) / steps
                 remaining = duration - ((i + 1) * sleep_interval)
                 
-                # GUI updates
                 self.record_alien_btn_text.value = f"GRAVANDO ({max(0.0, remaining):.1f}s)..."
                 self.countdown_text.value = f"GRAVANDO: {max(0.0, remaining):.1f}s"
                 self.progress_bar_inner.width = 280 * pct
                 
-                # Console ASCII progress bar update
                 bar_len = 20
                 filled = int(pct * bar_len)
                 bar_str = "█" * filled + "-" * (bar_len - filled)
@@ -444,13 +550,14 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 
             sd.wait()
             audio = audio_buffer.flatten()
-            max_val = np.max(np.abs(audio))
-            if max_val > 0: audio = audio / max_val
+            max_val = np.max(np.abs(audio)) if len(audio) > 0 else 0.0
+            if max_val > 0:
+                audio = audio / max_val
             self.recorded_alien_audio = audio
             
             self.play_button.disabled = False
             self.save_word_button.disabled = False
-            self.log_to_console(f"[APRENDIZADO] Captação de som finalizada. Valide jogando no reprodutor ou salve a assinatura.\n")
+            self.log_to_console("[APRENDIZADO] Captação de som finalizada. Valide jogando no reprodutor ou salve a assinatura.\n")
         except Exception as ex:
             self.log_to_console(f"[ERRO] Falha ao capturar som alienígena: {ex}\n")
         finally:
@@ -509,18 +616,25 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.page.update()
 
     def save_word(self, _e):
-        word = self.word_display.value.strip()
-        if not word or self.recorded_alien_audio is None: return
+        word_raw = self.word_display.value.strip()
+        if not word_raw or self.recorded_alien_audio is None: return
+        try:
+            word = sanitize_word_key(word_raw)
+            target_lang = sanitize_identifier(self.target_language)
+        except ValueError as ex:
+            self.log_to_console(f"[ERRO] Palavra ou idioma inválido: {ex}\n")
+            return
+
         self.save_word_button.disabled = True
         self.page.update()
         try:
-            self.log_to_console(f"[APRENDIZADO] Registrando '{word}' nas bases locais para o idioma '{self.target_language.upper()}'...\n")
-            filepath = self.translator.audio_processor.save_audio(self.recorded_alien_audio, word, self.target_language)
-            self.translator.db.add_word(self.target_language, word, filepath)
+            self.log_to_console(f"[APRENDIZADO] Registrando '{word}' nas bases locais para o idioma '{target_lang.upper()}'...\n")
+            filepath = self.translator.audio_processor.save_audio(self.recorded_alien_audio, word, target_lang)
+            self.translator.db.add_word(target_lang, word, filepath)
             signature = self.translator.audio_processor.extract_features(self.recorded_alien_audio)
-            self.translator.vdb.add_audio_signature(word=word, language=self.target_language, embedding=signature.tolist(), audio_path=filepath)
+            self.translator.vdb.add_audio_signature(word=word, language=target_lang, embedding=signature.tolist(), audio_path=filepath)
             self.log_to_console(f"[SUCESSO] '{word}' registrada com sucesso nas bases física, SQLite e ChromaDB!\n")
-            self.add_message_to_chat("Sistema", f"Novo emparelhamento indexado: '{word}' -> {self.target_language.upper()}", is_user=False)
+            self.add_message_to_chat("Sistema", f"Novo emparelhamento indexado: '{word}' -> {target_lang.upper()}", is_user=False)
             self.word_display.value = "NENHUMA"
             self.recorded_alien_audio = None
             self.play_button.disabled = True
@@ -613,10 +727,17 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
 
     def process_message(self, message: str, is_user: bool):
         if not is_user: return
-        self.add_message_to_chat("Você", message, is_user=True)
-        words = message.upper().split()
-        clean_words = [ ''.join(c for c in w if c.isalnum()) for w in words ]
-        clean_words = [ cw for cw in clean_words if cw ]
+        safe_msg = message[:MAX_MESSAGE_LENGTH]
+        self.add_message_to_chat("Você", safe_msg, is_user=True)
+        words = safe_msg.upper().split()
+        clean_words = []
+        for w in words:
+            try:
+                cw = sanitize_word_key(w)
+                if cw: clean_words.append(cw)
+            except ValueError:
+                continue
+
         if not clean_words: return
         spans = []
         audio_files_to_play = []
@@ -641,7 +762,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 audio, sr = librosa.load(path, sr=22050)
                 playback_duration = len(audio) / sr
                 threading.Thread(target=self.animate_playback, args=(playback_duration,), daemon=True).start()
-                max_val = np.max(np.abs(audio))
+                max_val = np.max(np.abs(audio)) if len(audio) > 0 else 0.0
                 if max_val > 0: audio = audio / max_val
                 
                 device_info = sd.query_devices(sd.default.device[1])
@@ -656,9 +777,11 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.is_playing_audio = False
         self.page.update()
 
+
 def main(page: ft.Page):
     app = TranslatorApp()
     app.main(page)
+
 
 if __name__ == "__main__":
     if hasattr(ft, 'run'):
