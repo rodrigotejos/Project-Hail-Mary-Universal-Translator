@@ -3,24 +3,24 @@ Universal Translator - Cloud Training & Benchmark Script for Google Colab.
 Executes Siamese network training with GPU acceleration and progressive profiling.
 """
 
+import glob
+import json
 import os
 import sys
-import time
-import json
-import glob
 import tarfile
+import time
 from datetime import datetime, timezone
+
+import torch
+from torch import nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Dataset
 
 print("=" * 65)
 print("  PROJECT HAIL MARY - UNIVERSAL TRANSLATOR: CLOUD TRAINING RUN")
 print("=" * 65)
 
 # 1. Device and Hardware Verification
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-
 if torch.cuda.is_available():
     device = torch.device("cuda")
     gpu_name = torch.cuda.get_device_name(0)
@@ -64,11 +64,13 @@ class SyntheticAcousticTripletDataset(Dataset):
         anchor = F.normalize(center + 0.08 * torch.randn(self.dim), p=2, dim=-1)
         positive = F.normalize(center + 0.08 * torch.randn(self.dim), p=2, dim=-1)
         diff_cluster = (cluster_id + torch.randint(1, 12, (1,)).item()) % 12
-        negative = F.normalize(self.cluster_centers[diff_cluster] + 0.08 * torch.randn(self.dim), p=2, dim=-1)
+        neg_center = self.cluster_centers[diff_cluster]
+        negative = F.normalize(neg_center + 0.08 * torch.randn(self.dim), p=2, dim=-1)
         return anchor, positive, negative
 
 # 4. Neural Architecture
 class SiameseProjectionNet(nn.Module):
+    """Acoustic Siamese projection network mapping features to latent embedding space."""
     def __init__(self, input_dim=128, embedding_dim=128):
         super().__init__()
         self.encoder = nn.Sequential(
@@ -82,10 +84,16 @@ class SiameseProjectionNet(nn.Module):
         )
 
     def forward_one(self, x):
+        """Encodes and normalizes a single acoustic sample."""
         return F.normalize(self.encoder(x), p=2, dim=-1)
 
-    def forward(self, a, p, n):
-        return self.forward_one(a), self.forward_one(p), self.forward_one(n)
+    def forward(self, anchor_in, pos_in, neg_in):
+        """Passes triplet samples through encoder."""
+        return (
+            self.forward_one(anchor_in),
+            self.forward_one(pos_in),
+            self.forward_one(neg_in)
+        )
 
 model = SiameseProjectionNet().to(device)
 
@@ -150,7 +158,11 @@ metrics = {
     "final_val_loss": round(loss_history[-1] * 1.04, 5),
     "relative_efficiency_score": round(speedup, 2),
     "recorded_at": datetime.now(timezone.utc).isoformat(),
-    "peak_vram_mb": round(torch.cuda.max_memory_allocated() / (1024**2), 1) if torch.cuda.is_available() else 0.0
+    "peak_vram_mb": (
+        round(torch.cuda.max_memory_allocated() / (1024**2), 1)
+        if torch.cuda.is_available()
+        else 0.0
+    ),
 }
 
 metrics_path = "/content/models/colab_runs/training_metrics.json"

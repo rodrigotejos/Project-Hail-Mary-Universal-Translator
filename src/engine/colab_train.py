@@ -6,16 +6,14 @@ Supports headless execution via Google Colab CLI (`colab exec`) and local dry-ru
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tarfile
-import tempfile
 from typing import Any, Dict, Optional, Tuple
 
 # torch and torch.nn.functional are lazily imported in validation functions
@@ -237,11 +235,12 @@ class ColabTrainOrchestrator:
 
     def run(self) -> Dict[str, Any]:
         """Executes the Colab job or simulates in dry-run mode."""
-        print(f"\n=======================================================")
+        acc_name = self.config.accelerator_type.upper()
+        print("\n=======================================================")
         print(f"  Google Colab Cloud Training: Job {self.config.job_id}")
-        print(f"  Accelerator: {self.config.accelerator_type.upper()} | Backbone: {self.config.backbone}")
+        print(f"  Accelerator: {acc_name} | Backbone: {self.config.backbone}")
         print(f"  Epochs: {self.config.epochs} | Dry-Run: {self.config.dry_run}")
-        print(f"=======================================================\n")
+        print("=======================================================\n")
 
         bundle_path = self.prepare_bundle()
 
@@ -303,21 +302,21 @@ class ColabTrainOrchestrator:
 
         print(f"[COLAB-CLI] Executing: {' '.join(cmd)}")
         try:
-            process = subprocess.Popen(
+            with subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
                 cwd=str(self.project_root)
-            )
+            ) as process:
+                if process.stdout:
+                    for line in process.stdout:
+                        print(f"[COLAB] {line.strip()}")
 
-            for line in process.stdout:
-                print(f"[COLAB] {line.strip()}")
-
-            process.wait()
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, cmd)
+                process.wait()
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(process.returncode, cmd)
 
             print("[COLAB-CLI] Execution finished successfully.")
             return {"status": "completed", "job_id": self.config.job_id}
@@ -408,6 +407,7 @@ def validate_checkpoint(
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """CLI entrypoint for Google Colab training orchestrator."""
     parser = argparse.ArgumentParser(
         description="Google Colab Cloud Training & Progressive Accelerator Benchmarking"
     )

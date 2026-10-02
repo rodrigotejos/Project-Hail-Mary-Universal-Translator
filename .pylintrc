@@ -1,6 +1,9 @@
 [MASTER]
 init-hook='import sys, os; sys.path.insert(0, os.path.abspath("src"))'
 
+[FORMAT]
+max-line-length=120
+
 [MESSAGES CONTROL]
-# Disable some Flet-specific false positives that might still occur
-disable=unexpected-keyword-arg,too-many-function-args,no-member,duplicate-code
+# Disable dynamic attribute & third-party framework false positives (Flet, PyTorch, Librosa)
+disable=unexpected-keyword-arg,too-many-function-args,no-member,duplicate-code,not-callable,too-few-public-methods,too-many-instance-attributes,import-outside-toplevel

@@ -62,6 +62,10 @@ models/colab_runs/*.tar.gz
 aidlc-workflows/
 aidlc-workflows.zip
 
+# Assistant Agent configurations and skills
+.agent/
+.agents/
+
 # BEGIN AI-DLC:gitignore
 # Logs
 logs
