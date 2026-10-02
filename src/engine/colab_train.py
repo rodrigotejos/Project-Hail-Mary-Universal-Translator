@@ -352,7 +352,12 @@ def validate_checkpoint(
 
     if has_torch:
         try:
-            state_dict = torch.load(checkpoint_path, map_location="cpu")
+            try:
+                state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+            except TypeError:
+                state_dict = torch.load(checkpoint_path, map_location="cpu")
+            except Exception:
+                state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         except Exception as exc:
             raise ValueError(f"Corrupted PyTorch state dict: {exc}") from exc
 

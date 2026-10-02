@@ -159,8 +159,12 @@ class TestAcousticCheckpointValidation(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         self.chk_path = Path(self.temp_dir) / "test_model.pth"
-        # Write dummy binary file > 1024 bytes
-        self.chk_path.write_bytes(b"P" * 2048)
+        try:
+            import torch
+            torch.save({"linear.weight": torch.randn(64, 64)}, self.chk_path)
+        except ImportError:
+            # Write dummy binary file > 1024 bytes
+            self.chk_path.write_bytes(b"P" * 2048)
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -182,6 +186,16 @@ class TestAcousticCheckpointValidation(unittest.TestCase):
         # Demanding unrealistically high margin (e.g. 1.8) triggers passed=False
         res = validate_checkpoint(self.chk_path, min_margin=1.80)
         self.assertFalse(res.passed)
+
+    def test_corrupted_checkpoint_raises_error(self):
+        corrupt_path = Path(self.temp_dir) / "corrupt.pth"
+        corrupt_path.write_bytes(b"CORRUPTED_NOT_A_VALID_PICKLE" * 100)
+        try:
+            import torch
+            with self.assertRaises(ValueError):
+                validate_checkpoint(corrupt_path)
+        except ImportError:
+            pass
 
 
 class TestColabCliExecutionFallback(unittest.TestCase):

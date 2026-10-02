@@ -14,6 +14,8 @@ import numpy as np
 import flet as ft
 import sounddevice as sd
 
+Button = getattr(ft, "Button", getattr(ft, "ElevatedButton", None))
+
 try:
     from src.ui.theme import THEME, get_theme
     from src.engine.translator import UniversalTranslator
@@ -162,7 +164,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         # --- HEADER ---
         self.status_text = ft.Text("SISTEMA INICIANDO (Carregando IA)...", color=THEME["status_color"], size=13, weight="bold")
         self.cloud_status_text = ft.Text("[Cloud] STATUS: OFFLINE", color=THEME["status_color"], size=13, weight="bold", key="txt-cloud-status")
-        self.sync_cloud_btn = ft.ElevatedButton("SINCRONIZAR NUVEM", icon=ft.Icons.CLOUD_SYNC, bgcolor=THEME["accent_color"], color="black", key="btn-sync-cloud")
+        self.sync_cloud_btn = Button("SINCRONIZAR NUVEM", icon=ft.Icons.CLOUD_SYNC, bgcolor=THEME["accent_color"], color="black", key="btn-sync-cloud")
         self.sync_cloud_btn.on_click = self.on_sync_cloud_click
 
         header = ft.Row([
@@ -192,7 +194,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         )
 
         self.countdown_text = ft.Text("STATUS: INATIVO", size=10, color="#888888", weight="bold")
-        self.play_button = ft.ElevatedButton("OUVIR ÁUDIO CAPTADO", icon=ft.Icons.PLAY_ARROW, bgcolor=THEME["accent_color"], color="black", disabled=True)
+        self.play_button = Button("OUVIR ÁUDIO CAPTADO", icon=ft.Icons.PLAY_ARROW, bgcolor=THEME["accent_color"], color="black", disabled=True)
         self.play_button.on_click = self.play_last_audio
         self.word_display = ft.Text("NENHUMA", size=36, weight="bold", color=THEME["status_color"], text_align="center")
 
@@ -257,9 +259,9 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.train_mode_dropdown = ft.Dropdown(label="Ambiente de Treino", options=[ft.dropdown.Option("local"), ft.dropdown.Option("cloud")], value=TRAINING_MODE, bgcolor="#111", border_color=THEME["border_color"], color="white")
         self.train_mode_dropdown.on_change = self.save_config
         
-        self.train_button = ft.ElevatedButton("EXECUTAR TREINAMENTO SIAMES", icon=ft.Icons.PLAY_CIRCLE_FILL, bgcolor=THEME["status_color"], color="black", disabled=True)
+        self.train_button = Button("EXECUTAR TREINAMENTO SIAMES", icon=ft.Icons.PLAY_CIRCLE_FILL, bgcolor=THEME["status_color"], color="black", disabled=True)
         self.train_button.on_click = lambda _: self.run_script_in_console("train_siamese.py", ["--epochs", "10"])
-        self.sync_button = ft.ElevatedButton("SINCRONIZAR CHROMADB", icon=ft.Icons.SYNC, bgcolor=THEME["accent_color"], color="black", disabled=True)
+        self.sync_button = Button("SINCRONIZAR CHROMADB", icon=ft.Icons.SYNC, bgcolor=THEME["accent_color"], color="black", disabled=True)
         self.sync_button.on_click = lambda _: self.run_script_in_console("migrate_to_vector_db.py")
 
         self.console_column = ft.Column([], scroll=ft.ScrollMode.AUTO, auto_scroll=True)

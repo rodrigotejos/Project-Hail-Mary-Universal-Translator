@@ -6,6 +6,9 @@ import flet as ft
 from ui.theme import THEME
 
 
+Button = getattr(ft, "Button", getattr(ft, "ElevatedButton", None))
+
+
 def create_panel(title, content):
     """Creates a standardized panel with title and content."""
     return ft.Container(
@@ -29,7 +32,7 @@ def create_panel(title, content):
 def create_main_layout():
     """Creates the main layout structure for the application and returns interactive controls."""
     txt_cloud_status = ft.Text("[Cloud] STATUS: OFFLINE", color=THEME["status_color"], key="txt-cloud-status")
-    btn_sync_cloud = ft.ElevatedButton("SINCRONIZAR NUVEM", icon=ft.Icons.SYNC, key="btn-sync-cloud")
+    btn_sync_cloud = Button("SINCRONIZAR NUVEM", icon=ft.Icons.SYNC, key="btn-sync-cloud")
     input_word_key = ft.TextField(hint_text="digite a palavra...", key="input-word-key")
     input_conversation_msg = ft.TextField(hint_text="escrever mensagem...", key="input-conversation-msg")
 
@@ -37,7 +40,7 @@ def create_main_layout():
     left_content = ft.Column([
         ft.Text("MÓDULO DE APRENDIZADO", color=THEME["accent_color"]),
         ft.Container(height=100, bgcolor="#1a1a1a"), # Mock waveform
-        ft.ElevatedButton("OUVIR ÁUDIO CAPTADO", bgcolor=THEME["accent_color"], color="black", key="btn-listen-audio"),
+        Button("OUVIR ÁUDIO CAPTADO", bgcolor=THEME["accent_color"], color="black", key="btn-listen-audio"),
         ft.Text("ENTRADA DE DADOS: PORTUGUÊS", color="white"),
         ft.Text("MÚSICA", size=40, weight="bold", color="#ff9000"),
         input_word_key,
