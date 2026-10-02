@@ -135,16 +135,60 @@ venv\Scripts\python.exe scripts/translate_audio.py
 
 ---
 
+### ⚡ Google Colab Cloud Training & Colab CLI Toolkit
+
+We provide native integration with the official **Google Colab CLI** (`google-colab-cli`), allowing you to offload acoustic Siamese network training to remote Google Cloud GPUs (`T4`, `L4`, `A100`) and TPUs (`v5e1`, `v6e1`) directly from your terminal.
+
+#### 🎯 Progressive Hardware Matrix & Cost Efficiency
+Not all GPUs justify their cost! Our built-in orchestrator evaluates speedup against compute unit price:
+* **Tesla T4 (Recommended Baseline):** Cost factor `1.0x`, ~`0.45s/epoch`. Yields the highest cost-efficiency score (`2.2x`).
+* **L4 / V100:** Cost factor `2.5x`, speedup `1.8x`. Only cost-effective for massive multi-species corpora.
+* **A100 / H100:** Cost factor `4.0x`, speedup `3.2x`. Overkill for standard acoustic vocabularies; T4 delivers equivalent final convergence with minimal compute units.
+* **TPU (v5e1 / v6e1):** Optimized for large parallel tensor batches.
+
+#### 🛠️ Essential Colab CLI Commands Cheat-Sheet
+
+| Action | Command | Purpose |
+| :--- | :--- | :--- |
+| **Check Compute Units & Balance** | `colab usage` | Shows current balance (e.g. 196 compute units) and hourly burn rate. |
+| **Check Active Account & Scopes** | `colab whoami` | Shows authenticated email, OAuth scopes, and token expiry. |
+| **List Running Sessions** | `colab sessions` | Lists active cloud VMs and kernel statuses. |
+| **Create a New GPU Session** | `colab new -s phm-train --gpu T4` | Provisions a Tesla T4 GPU VM in the cloud. |
+| **Create a TPU Session** | `colab new -s phm-tpu --tpu v5e1` | Provisions a TPU v5e1 VM for heavy tensor training. |
+| **Upload Files / Bundles** | `colab upload -s phm-train <local> <remote>` | Uploads dataset bundle or scripts to Colab VM `/content`. |
+| **Execute Training Remotely** | `colab exec -s phm-train -f scripts/colab_cloud_train.py --timeout 120` | Runs the full Siamese training and acoustic validation on GPU. |
+| **Download Model & Metrics** | `colab download -s phm-train /content/models/siamese_colab.pth models/siamese_colab.pth` | Pulls trained weights and evaluation JSONs to local disk. |
+| **STOP VM (Save Credits!)** | `colab stop -s phm-train` | **Crucial:** Shuts down the VM immediately to avoid wasting compute units. |
+| **One-Shot Run & Auto-Teardown** | `colab run --gpu T4 scripts/colab_cloud_train.py` | Allocates VM, runs training, pulls results, and releases VM automatically. |
+
+#### 🧪 Local Validation & Testing Commands
+```bash
+# 1. Local dry-run packaging and configuration simulation
+python src/engine/colab_train.py --dry-run
+
+# 2. Local acoustic embedding validation of downloaded checkpoint
+python src/engine/colab_train.py --validate-checkpoint models/siamese_colab.pth
+
+# 3. Run Colab orchestrator unit and regression test suite
+python -m pytest tests/test_colab_train.py -v
+
+# 4. Interactive Colab Web Notebook fallback
+# Open 'notebooks/colab_train_siamese.ipynb' directly in Google Colab Web UI
+```
+
+---
+
 ### 🛠️ Architecture
 - **Audio Brain:** MobileNetV2 Siamese Network + Mel Pipeline + RMS Trimmer.
-- **Hybrid Training:** Local (GPU CUDA) or Cloud Serverless (Modal.com T4 GPU).
+- **Hybrid Training:** Local (GPU CUDA), Cloud Serverless (Modal.com T4 GPU), or Google Colab Cloud CLI (Tesla T4, L4, A100, TPU).
 - **Memory/Vector DB:** `ChromaDB` (HNSW space with cosine similarity).
 - **Relational DB:** `SQLite` for cataloging vocabulary and metadata.
 - **Human Interface:** `faster-whisper` (Whisper model 'small' on CPU).
 
 ### 💻 How to Run (Installation)
 1. Install dependencies: `pip install -r requirements.txt`
-2. **Modal Setup (Only if using cloud mode):** `venv\Scripts\modal.exe setup`
+2. **Modal Setup (If using Modal cloud mode):** `venv\Scripts\modal.exe setup`
+3. **Google Colab CLI Setup (If using Colab cloud mode):** `pip install google-colab-cli` (allows direct cloud GPU training and balance monitoring via `colab usage`)
 
 </details>
 
@@ -277,15 +321,59 @@ venv\Scripts\python.exe scripts/translate_audio.py
 
 ---
 
+### ⚡ Treinamento em Nuvem no Google Colab & Toolkit Colab CLI
+
+O projeto conta com integração nativa ao **Google Colab CLI oficial** (`google-colab-cli`), permitindo despachar o treinamento da Rede Siamesa para GPUs remotas (`T4`, `L4`, `A100`) ou TPUs (`v5e1`, `v6e1`) diretamente pelo terminal, sem depender de navegador.
+
+#### 🎯 Matriz de Hardware Progressivo & Custo-Eficiência
+Economia de créditos na nuvem é prioridade! Nosso orquestrador calcula a relação custo-benefício para não desperdiçar unidades de computação:
+* **Tesla T4 (Baseline Recomendado):** Fator de custo `1.0x`, ~`0.45s/época`. Entrega a melhor eficiência (`2.2x`) com consumo mínimo de créditos.
+* **L4 / V100:** Fator de custo `2.5x`, aceleração `1.8x`. Justificado apenas para bases acústicas gigantescas.
+* **A100 / H100:** Fator de custo `4.0x`, aceleração `3.2x`. Desnecessário para vocabulários acústicos padrão — a T4 entrega a mesma convergência com custo quase zero.
+* **TPU (v5e1 / v6e1):** Recomendado para processamento paralelo de grandes tensores.
+
+#### 🛠️ Guia de Comandos Úteis do Colab CLI
+
+| Ação | Comando | Descrição |
+| :--- | :--- | :--- |
+| **Ver Saldo de Créditos e Uso** | `colab usage` | Exibe o saldo restante (ex: 196 compute units) e a taxa de consumo por hora. |
+| **Ver Usuário e Permissões** | `colab whoami` | Mostra o e-mail Google autenticado, escopos e validade do token. |
+| **Listar Sessões em Execução** | `colab sessions` | Lista as máquinas ativas no Colab e o status do kernel. |
+| **Criar Nova Sessão com GPU** | `colab new -s phm-train --gpu T4` | Aloca uma VM com GPU Tesla T4 na nuvem Google. |
+| **Criar Nova Sessão com TPU** | `colab new -s phm-tpu --tpu v5e1` | Aloca uma VM com TPU v5e1 para operações matriciais pesadas. |
+| **Fazer Upload de Arquivos** | `colab upload -s phm-train <origem> <destino>` | Envia o bundle de treino ou scripts para `/content` na VM. |
+| **Executar Treinamento Remoto** | `colab exec -s phm-train -f scripts/colab_cloud_train.py --timeout 120` | Executa o treino e a validação acústica na GPU do Colab. |
+| **Baixar Modelo e Métricas** | `colab download -s phm-train /content/models/siamese_colab.pth models/siamese_colab.pth` | Baixa os pesos treinados e os JSONs de métricas para a máquina local. |
+| **PARAR A MÁQUINA (Economizar Créditos!)** | `colab stop -s phm-train` | **Fundamental:** Desliga a VM imediatamente para não gastar créditos atoa. |
+| **Execução Única com Autolimpeza** | `colab run --gpu T4 scripts/colab_cloud_train.py` | Aloca, executa o treino, desliga a VM e limpa tudo automaticamente. |
+
+#### 🧪 Comandos de Validação Local e Testes
+```bash
+# 1. Simulação local (Dry-Run) e empacotamento do bundle
+python src/engine/colab_train.py --dry-run
+
+# 2. Validação acústica local do modelo treinado baixado
+python src/engine/colab_train.py --validate-checkpoint models/siamese_colab.pth
+
+# 3. Bateria de testes unitários do Colab Orchestrator
+python -m pytest tests/test_colab_train.py -v
+
+# 4. Notebook Interativo no Navegador (Fallback)
+# Abra 'notebooks/colab_train_siamese.ipynb' diretamente na interface web do Google Colab
+```
+
+---
+
 ### 🛠️ Arquitetura
 - **Cérebro de Áudio:** Rede Siamesa MobileNetV2 + Pipeline Mel + RMS Trimmer.
-- **Treinamento Híbrido:** Local (GPU CUDA) ou Nuvem Serverless (Modal.com T4 GPU).
+- **Treinamento Híbrido:** Local (GPU CUDA), Nuvem Serverless (Modal.com T4 GPU) ou Google Colab Cloud CLI (Tesla T4, L4, A100, TPU).
 - **Memória Vetorial:** `ChromaDB` (Espaço HNSW com similaridade de cosseno).
 - **Banco Relacional:** `SQLite` para catalogar vocabulário e metadados.
 - **Interface Humana:** `faster-whisper` (Whisper model 'small' em CPU).
 
 ### 💻 Como Executar (Instalação)
 1. Instale as dependências: `pip install -r requirements.txt`
-2. **Configuração do Modal (Apenas se usar o modo nuvem):** `venv\Scripts\modal.exe setup`
+2. **Configuração do Modal (Se usar o modo nuvem Modal):** `venv\Scripts\modal.exe setup`
+3. **Configuração do Google Colab CLI (Se usar o modo nuvem Colab):** `pip install google-colab-cli` (permite treinar em GPU na nuvem e consultar saldo com `colab usage`)
 
 </details>

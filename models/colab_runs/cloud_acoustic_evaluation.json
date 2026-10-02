@@ -1,0 +1,10 @@
+{
+  "evaluation_id": "eval_colab_20261002_231149",
+  "job_id": "colab_20261002_231149",
+  "checkpoint_path": "/content/models/siamese_colab.pth",
+  "mean_positive_distance": 0.0087,
+  "mean_negative_distance": 0.6817,
+  "separation_delta": 0.6729,
+  "min_required_margin": 0.15,
+  "passed": true
+}

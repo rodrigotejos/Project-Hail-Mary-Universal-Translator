@@ -1,0 +1,12 @@
+{
+  "job_id": "colab_20261002_231149",
+  "accelerator_used": "Tesla T4",
+  "total_epochs_completed": 15,
+  "total_duration_seconds": 6.779,
+  "seconds_per_epoch": 0.452,
+  "final_train_loss": 0.0,
+  "final_val_loss": 0.0,
+  "relative_efficiency_score": 2.21,
+  "recorded_at": "2026-10-02T23:11:49.030997+00:00",
+  "peak_vram_mb": 20.1
+}

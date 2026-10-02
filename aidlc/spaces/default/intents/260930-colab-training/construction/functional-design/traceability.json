@@ -1,0 +1,49 @@
+{
+  "stage": "functional-design",
+  "upstream_ids": [
+    "FR1",
+    "FR1.1",
+    "FR1.2",
+    "FR1.3",
+    "FR1.4",
+    "FR2",
+    "FR2.1",
+    "FR2.2",
+    "FR2.3",
+    "FR2.4",
+    "FR2.5",
+    "FR3",
+    "FR3.1",
+    "FR3.2",
+    "FR3.3",
+    "FR4",
+    "FR4.1",
+    "FR4.2",
+    "FR4.3"
+  ],
+  "coverage": [
+    { "id": "FR1", "status": "OK", "target": "BR1.1" },
+    { "id": "FR1.1", "status": "OK", "target": "BR1.1" },
+    { "id": "FR1.2", "status": "OK", "target": "BR1.1" },
+    { "id": "FR1.3", "status": "OK", "target": "BR1.2" },
+    { "id": "FR1.4", "status": "OK", "target": "BR1.3" },
+    { "id": "FR2", "status": "OK", "target": "BR2.1" },
+    { "id": "FR2.1", "status": "OK", "target": "BR2.1" },
+    { "id": "FR2.2", "status": "OK", "target": "BR2.1" },
+    { "id": "FR2.3", "status": "OK", "target": "BR2.2" },
+    { "id": "FR2.4", "status": "OK", "target": "BR2.2" },
+    { "id": "FR2.5", "status": "OK", "target": "BR2.1" },
+    { "id": "FR3", "status": "OK", "target": "BR3.1" },
+    { "id": "FR3.1", "status": "OK", "target": "BR3.1" },
+    { "id": "FR3.2", "status": "OK", "target": "BR3.2" },
+    { "id": "FR3.3", "status": "OK", "target": "BR3.2" },
+    { "id": "FR4", "status": "OK", "target": "BR4.1" },
+    { "id": "FR4.1", "status": "OK", "target": "BR4.1" },
+    { "id": "FR4.2", "status": "OK", "target": "BR4.2" },
+    { "id": "FR4.3", "status": "OK", "target": "BR4.2" }
+  ],
+  "reverse": [
+    { "id": "BR3.3", "status": "N/A", "target": "Technical hardware quota fallback rule" },
+    { "id": "BR4.3", "status": "N/A", "target": "Technical security rule derived from NFR4" }
+  ]
+}

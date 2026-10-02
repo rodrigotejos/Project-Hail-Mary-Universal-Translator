@@ -1,0 +1,15 @@
+[
+  {
+    "uuid": "01a0f270-2b1a-7841-937c-178f102bc262",
+    "slug": "default",
+    "dirName": "260930-default",
+    "status": "archived"
+  },
+  {
+    "uuid": "01a0f271-16b8-7a3e-8a6e-d05d1dc2c3fd",
+    "slug": "colab-training",
+    "dirName": "260930-colab-training",
+    "scope": "colab-cloud-training",
+    "status": "complete"
+  }
+]
