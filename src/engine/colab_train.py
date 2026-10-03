@@ -352,11 +352,7 @@ def validate_checkpoint(
 
     if has_torch:
         try:
-            try:
-                state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-            except TypeError:
-                # Older PyTorch versions (< 2.4) do not accept the weights_only argument
-                state_dict = torch.load(checkpoint_path, map_location="cpu")
+            state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
         except Exception as exc:
             raise ValueError(f"Corrupted PyTorch state dict: {exc}") from exc
 
@@ -372,17 +368,17 @@ def validate_checkpoint(
         d_pos = (1.0 - F.cosine_similarity(v_anchors, v_positives, dim=-1)).mean().item()
         d_neg = (1.0 - F.cosine_similarity(v_anchors, v_negatives, dim=-1)).mean().item()
     else:
-        # Fallback using numpy when running on a lightweight runner without PyTorch
+        # Fallback using numpy Generator when running on a runner without PyTorch
         import numpy as np
-        np.random.seed(42)
+        rng = np.random.default_rng(42)
         dim = 128
-        anchors = np.random.randn(sample_pairs, dim)
+        anchors = rng.standard_normal((sample_pairs, dim))
         anchors /= np.linalg.norm(anchors, axis=-1, keepdims=True)
 
-        positives = anchors + 0.15 * np.random.randn(sample_pairs, dim)
+        positives = anchors + 0.15 * rng.standard_normal((sample_pairs, dim))
         positives /= np.linalg.norm(positives, axis=-1, keepdims=True)
 
-        negatives = np.random.randn(sample_pairs, dim)
+        negatives = rng.standard_normal((sample_pairs, dim))
         negatives /= np.linalg.norm(negatives, axis=-1, keepdims=True)
 
         cos_pos = np.sum(anchors * positives, axis=-1)
