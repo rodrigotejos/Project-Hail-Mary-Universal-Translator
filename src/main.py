@@ -528,7 +528,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             
             steps = 40
             sleep_interval = duration / steps
-            import random
             for i in range(steps):
                 pct = (i + 1) / steps
                 remaining = duration - ((i + 1) * sleep_interval)
@@ -543,7 +542,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 console_progress.value = f"[GRAVAÇÃO] [{bar_str}] {int(pct*100)}%"
                 
                 for bar in self.vu_bars:
-                    bar.height = secrets.SystemRandom().randint(10, 90)
+                    bar.height = 10 + secrets.randbelow(81)  # NOSONAR
                     if bar.height > 70: bar.bgcolor = "#ff9000"
                     elif bar.height > 40: bar.bgcolor = "#00f0ff"
                     else: bar.bgcolor = "#0055ff"
@@ -598,7 +597,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         threading.Thread(target=play_task, daemon=True).start()
 
     def animate_playback(self, duration: float):
-        import random
         steps = int(duration / 0.1)
         if steps == 0: steps = 10
         sleep_interval = duration / steps
@@ -607,7 +605,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         for _ in range(steps):
             if not self.is_playing_audio: break
             for bar in self.vu_bars:
-                bar.height = secrets.SystemRandom().randint(10, 60)
+                bar.height = 10 + secrets.randbelow(51)  # NOSONAR
                 bar.bgcolor = THEME["accent_color"]
             self.page.update()
             time.sleep(sleep_interval)
@@ -700,7 +698,6 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
             audio_buffer = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='float32')
             steps = 40
             sleep_interval = duration / steps
-            import random
             for i in range(steps):
                 pct = (i + 1) / steps
                 bar_len = 20
