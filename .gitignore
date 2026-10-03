@@ -27,9 +27,12 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Pytest cache
+# Pytest cache & Coverage
 .pytest_cache/
 .cache/
+.coverage
+.coverage.*
+coverage.xml
 
 # IDEs
 .vscode/

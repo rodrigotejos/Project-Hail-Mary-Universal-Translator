@@ -355,9 +355,8 @@ def validate_checkpoint(
             try:
                 state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
             except TypeError:
+                # Older PyTorch versions (< 2.4) do not accept the weights_only argument
                 state_dict = torch.load(checkpoint_path, map_location="cpu")
-            except Exception:
-                state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         except Exception as exc:
             raise ValueError(f"Corrupted PyTorch state dict: {exc}") from exc
 

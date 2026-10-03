@@ -207,7 +207,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         self.record_alien_btn_text = ft.Text("GRAVAR SOM ALIENÍGENA", color="white", weight="bold", size=13)
         self.record_alien_btn = ft.Container(
             content=ft.Row([ft.Icon(ft.Icons.FIBER_MANUAL_RECORD, color="white", size=16), self.record_alien_btn_text], alignment=ft.MainAxisAlignment.CENTER),
-            bgcolor="#ff2a2a", width=260, height=45, border_radius=5, alignment=ft.alignment.center, on_click=self.record_alien_sound_start, ink=True
+            bgcolor="#ff2a2a", width=260, height=45, border_radius=5, alignment=ft.Alignment(0, 0), on_click=self.record_alien_sound_start, ink=True
         )
 
         self.save_word_button = ft.IconButton(icon=ft.Icons.SAVE, icon_color="green", icon_size=28, disabled=True)

@@ -36,3 +36,17 @@ def test_sync_result_formatting():
     res_fail = SyncResult(success=False, error_message="Network Timeout")
     assert res_fail.success is False
     assert res_fail.error_message == "Network Timeout"
+
+
+def test_translator_app_ui_initialization():
+    """Verify that TranslatorApp initializes UI elements correctly with modern Flet."""
+    from src.main import TranslatorApp
+    page_mock = MagicMock()
+    app = TranslatorApp()
+    app.page = page_mock
+    app.create_ui_elements()
+
+    assert app.sync_cloud_btn is not None
+    assert app.sync_cloud_btn.key == "btn-sync-cloud"
+    assert app.text_input.key == "input-word-key"
+    assert app.layout_container is not None
