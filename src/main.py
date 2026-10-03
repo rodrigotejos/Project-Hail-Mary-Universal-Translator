@@ -10,6 +10,7 @@ import time
 import tempfile
 import threading
 import subprocess
+import secrets
 import numpy as np
 import flet as ft
 import sounddevice as sd
@@ -542,7 +543,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
                 console_progress.value = f"[GRAVAÇÃO] [{bar_str}] {int(pct*100)}%"
                 
                 for bar in self.vu_bars:
-                    bar.height = random.randint(10, 90)
+                    bar.height = secrets.SystemRandom().randint(10, 90)
                     if bar.height > 70: bar.bgcolor = "#ff9000"
                     elif bar.height > 40: bar.bgcolor = "#00f0ff"
                     else: bar.bgcolor = "#0055ff"
@@ -606,7 +607,7 @@ class TranslatorApp:  # pylint: disable=too-many-instance-attributes
         for _ in range(steps):
             if not self.is_playing_audio: break
             for bar in self.vu_bars:
-                bar.height = random.randint(10, 60)
+                bar.height = secrets.SystemRandom().randint(10, 60)
                 bar.bgcolor = THEME["accent_color"]
             self.page.update()
             time.sleep(sleep_interval)
